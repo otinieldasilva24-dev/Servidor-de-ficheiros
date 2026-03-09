@@ -1,59 +1,49 @@
+const { headerPadrao, renderDashboard, renderError } = require('./utils/renders');
 const express = require('express');
 const session = require('express-session');
-const bcrypt = require('bcrypt');
-const db = require('./database');
+const db = require('./config/database');
 const path = require('path');
+const multer = require('multer');
+const fs = require('fs');
+
+// 1. IMPORTAR AS ROTAS DE AUTENTICAÇÃO (O ficheiro que criámos antes)
+const authRoutes = require('./routes/auth');
 
 const app = express();
 
+// --- GARANTIR QUE A PASTA UPLOADS EXISTE ---
+const uploadDir = './uploads';
+if (!fs.existsSync(uploadDir)){
+    fs.mkdirSync(uploadDir);
+}
+
+// --- CONFIGURAÇÕES DO SERVIDOR ---
 app.use(express.static('public'));
+app.use('/uploads', express.static('uploads')); // Para conseguires abrir os ficheiros depois
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
-    secret: 'segredo-projeto-2026',
+    secret: 'segredo-inamet-2026',
     resave: false,
-    saveUninitialized: false
+    saveUninitialized: false,
+    cookie: { maxAge: 24 * 60 * 60 * 1000 } // Sessão dura 24 horas
 }));
 
-// --- FUNÇÃO AUXILIAR: RENDERIZAR ERROS INSTITUCIONAIS ---
-const renderError = (titulo, mensagem, tipo) => {
-    const icon = tipo === 'error' ? '❌' : '⚠️';
-    const color = tipo === 'error' ? 'text-red-500' : 'text-yellow-500';
-    return `
-        <script src="https://cdn.tailwindcss.com"></script>
-        <div class="h-screen flex items-center justify-center bg-slate-50 font-sans">
-            <div class="bg-white p-10 rounded-[2rem] shadow-xl border border-slate-100 text-center max-w-md">
-                <div class="text-5xl mb-4">${icon}</div>
-                <h2 class="text-2xl font-black text-slate-800 uppercase mb-2">${titulo}</h2>
-                <p class="text-slate-500 mb-6">${mensagem}</p>
-                <button onclick="window.history.back()" class="bg-blue-700 text-white px-8 py-3 rounded-xl font-bold uppercase text-xs tracking-widest">Tentar Novamente</button>
-            </div>
-        </div>
-    `;
-};
+// --- CONFIGURAÇÃO DO MULTER (GESTÃO DE FICHEIROS) ---
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/'); 
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+});
+const upload = multer({ storage: storage });
 
-// --- FUNÇÃO AUXILIAR: CABEÇALHO ---
-const headerPadrao = `
-    <header class="fixed top-0 w-full z-50 glass border-b border-slate-200 h-20 bg-white/90 backdrop-blur-md"> 
-        <div class="container mx-auto px-6 h-full flex justify-between items-center">
-            <div class="flex items-center gap-3">
-                <img src="/img/logo-inamet.png" alt="Logo INAMET" class="h-16 w-auto object-contain py-1">
-                <div class="border-l border-slate-300 pl-3 hidden sm:block">
-                    <h1 class="font-black text-slate-800 leading-none tracking-tighter text-xl">INAMET</h1>
-                    <p class="text-[10px] uppercase tracking-tighter text-slate-500 font-bold leading-tight">
-                        Instituto Nacional de <br> Meteorologia e Geofísica
-                    </p>
-                </div>
-            </div>
-            <nav class="hidden md:flex gap-8 text-sm font-semibold text-slate-600">
-                <a href="/" class="hover:text-blue-700 transition">Início</a>
-                <a href="/departamentos" class="hover:text-blue-700 transition">Departamentos</a>
-                <a href="/suporte" class="hover:text-blue-700 transition">Suporte</a>
-            </nav>
-        </div>
-    </header>
-`;
+// --- 2. USAR AS ROTAS DE AUTENTICAÇÃO ---
+app.use('/', authRoutes);
 
-// --- 1. PÁGINA INICIAL ---
+// --- 3. PÁGINA INICIAL (LANDING PAGE) ---
 app.get('/', (req, res) => {
     res.send(`
         <!DOCTYPE html>
@@ -83,7 +73,7 @@ app.get('/', (req, res) => {
                             Servidor Central <br> de <span class="text-blue-700">Ficheiros.</span>
                         </h3>
                         <p class="text-lg text-slate-600 mb-10 max-w-lg leading-relaxed">
-                            Gestão segura de dados meteorológicos e geofísicos. Organize documentos por departamentos com criptografia de ponta.
+                            Gestão segura de dados meteorológicos e geofísicos do INAMET. Organize documentos por departamentos com criptografia de ponta.
                         </p>
                         <div class="flex flex-col sm:flex-row gap-4">
                             <a href="/login" class="bg-blue-700 text-white px-10 py-4 rounded-full font-bold shadow-xl shadow-blue-200 hover:bg-blue-800 hover:-translate-y-1 transition-all text-center">
@@ -121,7 +111,7 @@ app.get('/', (req, res) => {
     `);
 });
 
-// --- 2. DEPARTAMENTOS ---
+// --- 4. DEPARTAMENTOS ---
 app.get('/departamentos', (req, res) => {
     res.send(`
         <!DOCTYPE html>
@@ -150,475 +140,94 @@ app.get('/departamentos', (req, res) => {
     `);
 });
 
-// --- 3. SUPORTE (CORRIGIDO) ---
-// --- NOVA ROTA: SUPORTE ESTILIZADA ---
+// --- 5. SUPORTE ---
 app.get('/suporte', (req, res) => {
     res.send(`
         <!DOCTYPE html>
         <html lang="pt">
         <head>
             <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <script src="https://cdn.tailwindcss.com"></script>
-            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
-            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-            <title>INAMET | Suporte Técnico</title>
-            <style>
-                body { font-family: 'Inter', sans-serif; }
-                .glass-card { 
-                    background: #ffffff;
-                    border: 1px solid #f1f5f9;
-                    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05);
-                    border-radius: 3rem;
-                }
-                .support-icon {
-                    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-                    color: #1d4ed8;
-                }
-            </style>
+            <title>INAMET | Suporte</title>
         </head>
-        <body class="bg-slate-50 antialiased text-slate-900">
+        <body class="bg-slate-50 pt-32 font-sans">
             ${headerPadrao}
-
-            <main class="min-h-screen pt-32 pb-12 px-6 flex flex-col items-center">
-                <div class="max-w-4xl w-full">
-                    
-                    <div class="text-center mb-12 animate__animated animate__fadeIn">
-                        <h2 class="text-4xl font-800 text-slate-800 tracking-tighter uppercase">Central de <span class="text-blue-700">Suporte</span></h2>
-                        <p class="text-slate-500 mt-2 font-medium">Como podemos ajudar a manter a sua produtividade hoje?</p>
-                        <div class="h-1.5 w-16 bg-blue-600 mx-auto mt-4 rounded-full"></div>
-                    </div>
-
-                    <div class="grid md:grid-cols-2 gap-8 animate__animated animate__fadeInUp">
-                        <div class="glass-card p-10 flex flex-col items-center text-center group hover:border-blue-200 transition-all">
-                            <div class="w-20 h-20 support-icon rounded-[2rem] flex items-center justify-center text-3xl mb-6 group-hover:scale-110 transition-transform">
-                                📧
-                            </div>
-                            <h3 class="text-xl font-bold text-slate-800 mb-2">E-mail Institucional</h3>
-                            <p class="text-sm text-slate-500 mb-6">Para questões técnicas de acesso ou bugs no repositório.</p>
-                            <span class="text-blue-700 font-bold tracking-tight bg-blue-50 px-4 py-2 rounded-full border border-blue-100">
-                                suporte.ti@inamet.gov.ao
-                            </span>
-                        </div>
-
-                        <div class="glass-card p-10 flex flex-col items-center text-center group hover:border-blue-200 transition-all">
-                            <div class="w-20 h-20 support-icon rounded-[2rem] flex items-center justify-center text-3xl mb-6 group-hover:scale-110 transition-transform">
-                                📞
-                            </div>
-                            <h3 class="text-xl font-bold text-slate-800 mb-2">Linha de Apoio</h3>
-                            <p class="text-sm text-slate-500 mb-6">Disponível de Segunda a Sexta, das 08h às 15h30.</p>
-                            <span class="text-blue-700 font-bold tracking-tight bg-blue-50 px-4 py-2 rounded-full border border-blue-100">
-                                +244 9XX XXX XXX
-                            </span>
-                        </div>
-                    </div>
-
-                    <div class="mt-12 glass-card p-8 flex flex-col md:flex-row items-center justify-between bg-blue-700 border-none animate__animated animate__fadeInUp animate__delay-1s">
-                        <div class="text-white mb-6 md:mb-0 text-center md:text-left">
-                            <h4 class="font-bold text-lg">Esqueceu a sua palavra-passe?</h4>
-                            <p class="text-blue-100 text-sm">O processo de recuperação deve ser solicitado ao administrador de TI.</p>
-                        </div>
-                        <a href="mailto:suporte.ti@inamet.gov.ao" class="bg-white text-blue-700 px-8 py-3 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-colors">
-                            Solicitar Nova Senha
-                        </a>
-                    </div>
-
-                    <div class="mt-12 text-center">
-                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em]">INAMET | Departamento de Tecnologia de Informação</p>
+            <div class="container mx-auto px-6 flex justify-center">
+                <div class="max-w-2xl bg-white p-12 rounded-[3rem] shadow-xl text-center">
+                    <h2 class="text-4xl font-black text-slate-800 mb-6 uppercase">Suporte <span class="text-blue-700">Técnico</span></h2>
+                    <p class="text-slate-500 mb-8 leading-relaxed">Problemas com o acesso? Entre em contacto com o departamento de TI através do e-mail institucional.</p>
+                    <div class="p-6 bg-blue-50 rounded-2xl border border-blue-100 font-bold text-blue-700">
+                        suporte.ti@inamet.gov.ao
                     </div>
                 </div>
-            </main>
-        </body>
-        </html>
-    `);
-});
-
-// --- 4. LOGIN (VIEW) ---
-app.get('/login', (req, res) => {
-    res.send(`
-        <!DOCTYPE html>
-        <html lang="pt">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <script src="https://cdn.tailwindcss.com"></script>
-            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
-            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-            <title>INAMET | Login</title>
-            <style>
-                body { font-family: 'Inter', sans-serif; overflow: hidden; }
-                .glass-card { background: #ffffff; border: 1px solid #f1f5f9; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05); }
-                .input-field { transition: all 0.2s ease; border: 1.5px solid #f1f5f9; }
-                .input-field:focus { border-color: #2563eb; background: white; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1); outline: none; }
-                .btn-primary { background-color: #1d4ed8; transition: all 0.3s ease; }
-                .btn-primary:hover { background-color: #1e40af; transform: translateY(-1px); }
-            </style>
-        </head>
-        <body class="bg-white antialiased">
-            ${headerPadrao}
-            <main class="h-screen w-full flex flex-col items-center justify-center px-6 overflow-hidden">
-                <div class="w-full max-w-[440px] glass-card rounded-[3rem] p-8 animate__animated animate__fadeInUp">
-                    <div class="mb-8 text-center">
-                        <h2 class="text-3xl font-800 text-slate-800 tracking-tighter uppercase">Portal <span class="text-blue-700">Login</span></h2>
-                        <div class="h-1 w-12 bg-blue-600 mx-auto mt-2 rounded-full"></div>
-                    </div>
-                    <form action="/login" method="POST" class="space-y-5">
-                        <div>
-                            <label class="block text-[9px] font-extrabold text-slate-400 uppercase tracking-[0.2em] mb-1.5 ml-1">E-mail Institucional</label>
-                            <input type="email" name="email" required placeholder="exemplo@inamet.gov.ao" class="input-field w-full px-5 py-3.5 rounded-2xl bg-slate-50 text-sm text-slate-700">
-                        </div>
-                        <div>
-                            <div class="flex justify-between items-center mb-1.5 ml-1">
-                                <label class="text-[9px] font-extrabold text-slate-400 uppercase tracking-[0.2em]">Palavra-passe</label>
-                                <a href="/recuperar-senha" class="text-[9px] font-bold text-blue-600 uppercase">Esqueceu?</a>
-                            </div>
-                            <input type="password" name="senha" required placeholder="••••••••" class="input-field w-full px-5 py-3.5 rounded-2xl bg-slate-50 text-sm text-slate-700">
-                        </div>
-                        <button type="submit" class="btn-primary w-full text-white py-4 rounded-2xl font-bold uppercase tracking-[0.15em] text-xs shadow-lg mt-2">Aceder ao Painel</button>
-                    </form>
-                    <div class="mt-8 pt-6 border-t border-slate-50 text-center flex flex-col gap-2">
-                        <a href="/" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">← Voltar ao Início</a>
-                        <p class="text-xs text-slate-400 font-medium">Não tem conta? <a href="/registo" class="text-blue-600 font-bold hover:underline ml-1">Solicitar Acesso</a></p>
-                    </div>
-                </div>
-            </main>
-        </body>
-        </html>
-    `);
-});
-
-// --- 5. REGISTO (VIEW) ---
-app.get('/registo', (req, res) => {
-    res.send(`
-        <!DOCTYPE html>
-        <html lang="pt">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <script src="https://cdn.tailwindcss.com"></script>
-            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
-            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-            <title>INAMET | Registo</title>
-            <style>
-                body { font-family: 'Inter', sans-serif; overflow: hidden; }
-                .glass-card { background: #ffffff; border: 1px solid #f1f5f9; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05); }
-                .input-field { transition: all 0.2s ease; border: 1.5px solid #f1f5f9; }
-                .input-field:focus { border-color: #2563eb; background: white; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1); outline: none; }
-                select.input-field { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 1.25rem center; background-size: 1rem; }
-                .btn-primary { background-color: #1d4ed8; transition: all 0.3s ease; }
-            </style>
-        </head>
-        <body class="bg-white antialiased">
-            ${headerPadrao}
-            <main class="h-screen w-full flex flex-col items-center justify-center px-6 overflow-hidden">
-                <div class="w-full max-w-[440px] glass-card rounded-[3rem] p-8 mt-12 animate__animated animate__fadeInUp">
-                    <div class="mb-6 text-center">
-                        <h2 class="text-3xl font-800 text-slate-800 tracking-tighter uppercase">Novo <span class="text-blue-700">Registo</span></h2>
-                        <div class="h-1 w-12 bg-blue-600 mx-auto mt-2 rounded-full"></div>
-                    </div>
-                    <form action="/registo" method="POST" class="space-y-3">
-                        <div>
-                            <label class="block text-[9px] font-extrabold text-slate-400 uppercase tracking-[0.2em] mb-1 ml-1">Nome Completo</label>
-                            <input type="text" name="nome" required placeholder="Ex: João Manuel" class="input-field w-full px-5 py-3 rounded-2xl bg-slate-50 text-sm text-slate-700">
-                        </div>
-                        <div>
-                            <label class="block text-[9px] font-extrabold text-slate-400 uppercase tracking-[0.2em] mb-1 ml-1">E-mail Profissional</label>
-                            <input type="email" name="email" required placeholder="exemplo@inamet.gov.ao" class="input-field w-full px-5 py-3 rounded-2xl bg-slate-50 text-sm text-slate-700">
-                        </div>
-                        <div>
-                            <label class="block text-[9px] font-extrabold text-slate-400 uppercase tracking-[0.2em] mb-1 ml-1">Definir Senha</label>
-                            <input type="password" name="senha" required placeholder="••••••••" class="input-field w-full px-5 py-3 rounded-2xl bg-slate-50 text-sm text-slate-700">
-                        </div>
-                        <div>
-                            <label class="block text-[9px] font-extrabold text-slate-400 uppercase tracking-[0.2em] mb-1 ml-1">Departamento</label>
-                            <select name="departamento" required class="input-field w-full px-5 py-3 rounded-2xl bg-slate-50 text-sm text-slate-500">
-                                <option value="" disabled selected>Selecionar Área</option>
-                                <option value="logistica">Logística</option>
-                                <option value="financeiro">Financeiro</option>
-                                <option value="rh">Recursos Humanos</option>
-                                <option value="ti">Tecnologia (TI)</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="btn-primary w-full text-white py-3.5 rounded-2xl font-bold uppercase tracking-[0.15em] text-xs shadow-lg mt-2">Finalizar Cadastro</button>
-                    </form>
-                    <div class="mt-6 pt-6 border-t border-slate-50 text-center flex flex-col gap-2">
-                        <a href="/" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">← Voltar ao Início</a>
-                        <p class="text-xs text-slate-400 font-medium">Já tem conta? <a href="/login" class="text-blue-600 font-bold hover:underline ml-1">Fazer Login</a></p>
-                    </div>
-                </div>
-            </main>
-        </body>
-        </html>
-    `);
-});
-
-app.post('/registo', async (req, res) => {
-    const { nome, email, senha, departamento } = req.body;
-
-    try {
-        const hash = await bcrypt.hash(senha, 10);
-        
-        db.run(`INSERT INTO usuarios (nome, email, senha, departamento) VALUES (?, ?, ?, ?)`, 
-        [nome, email, hash, departamento], (err) => {
-            
-            if (err) {
-                // Se cair aqui, é o erro que viste no terminal (e-mail duplicado)
-                console.error("ERRO DETECTADO:", err.message);
-                
-                return res.send(`
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-                        <script src="https://cdn.tailwindcss.com"></script>
-                    </head>
-                    <body class="bg-slate-50">
-                        <script>
-                            Swal.fire({
-                                icon: 'warning',
-                                title: 'Utilizador já Registado',
-                                text: 'Este e-mail (${email}) já possui uma conta no INAMET. Tente fazer login ou recuperar a senha.',
-                                confirmButtonColor: '#1d4ed8',
-                                confirmButtonText: 'Ir para Login'
-                            }).then(() => {
-                                window.location.href = '/login';
-                            });
-                        </script>
-                    </body>
-                    </html>
-                `);
-            }
-
-            // Se NÃO houver erro, faz o cadastro normal
-            return res.send(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-                    <script src="https://cdn.tailwindcss.com"></script>
-                </head>
-                <body class="bg-slate-50">
-                    <script>
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Cadastro Realizado!',
-                            text: 'Bem-vindo ao sistema, ${nome}.',
-                            confirmButtonColor: '#1d4ed8'
-                        }).then(() => {
-                            window.location.href = '/login';
-                        });
-                    </script>
-                </body>
-                </html>
-            `);
-        });
-    } catch (e) {
-        res.send(renderError('Erro', 'Falha no servidor', 'error'));
-    }
-});
-
-// --- 6. LOGICA POST ---
-app.post('/login', (req, res) => {
-    const { email, senha } = req.body;
-    db.get(`SELECT * FROM usuarios WHERE email = ?`, [email], async (err, user) => {
-        if (err || !user) {
-            return res.send(renderError('Acesso Negado', 'Utilizador não encontrado no sistema institucional.', 'error'));
-        }
-        const match = await bcrypt.compare(senha, user.senha);
-        if (match) {
-            req.session.user = user;
-            res.redirect('/dashboard');
-        } else {
-            res.send(renderError('Falha na Autenticação', 'A palavra-passe inserida está incorreta.', 'warning'));
-        }
-    });
-});
-
-app.post('/registo', async (req, res) => {
-    const { nome, email, senha, departamento } = req.body;
-    const hash = await bcrypt.hash(senha, 10);
-    db.run(`INSERT INTO usuarios (nome, email, senha, departamento) VALUES (?, ?, ?, ?)`, 
-    [nome, email, hash, departamento], (err) => {
-        if (err) {
-            return res.send(`<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script><script>Swal.fire({ icon: 'error', title: 'Erro', text: 'E-mail em uso.' }).then(() => { window.history.back(); });</script>`);
-        }
-        res.send(`<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script><script>Swal.fire({ icon: 'success', title: 'Concluído!', text: 'Já pode fazer login.', confirmButtonColor: '#1d4ed8' }).then(() => { window.location.href = '/login'; });</script>`);
-    });
-});
-
-
-
-app.get('/recuperar-senha', (req, res) => {
-    res.send(`
-        <!DOCTYPE html>
-        <html lang="pt">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <script src="https://cdn.tailwindcss.com"></script>
-            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
-            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-            <title>INAMET | Recuperar Acesso</title>
-            <style>
-                body { font-family: 'Inter', sans-serif; overflow: hidden; }
-                .glass-card { background: #ffffff; border: 1px solid #f1f5f9; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05); }
-                .input-field { transition: all 0.2s ease; border: 1.5px solid #f1f5f9; }
-                .input-field:focus { border-color: #2563eb; background: white; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1); outline: none; }
-                .btn-primary { background-color: #1d4ed8; transition: all 0.3s ease; }
-                .btn-primary:hover { background-color: #1e40af; transform: translateY(-1px); }
-            </style>
-        </head>
-        <body class="bg-white antialiased">
-            ${headerPadrao}
-            <main class="h-screen w-full flex flex-col items-center justify-center px-6 overflow-hidden">
-                <div class="w-full max-w-[440px] glass-card rounded-[3rem] p-10 animate__animated animate__fadeInUp">
-                    <div class="mb-8 text-center">
-                        <div class="w-16 h-16 bg-blue-50 text-blue-700 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4">🔑</div>
-                        <h2 class="text-3xl font-800 text-slate-800 tracking-tighter uppercase">Recuperar <span class="text-blue-700">Senha</span></h2>
-                        <p class="text-[11px] text-slate-500 font-medium mt-2 px-6 leading-relaxed">
-                            Insira o seu e-mail institucional para identificarmos a sua conta no sistema.
-                        </p>
-                    </div>
-                    
-                    <form action="/recuperar-senha" method="POST" class="space-y-6">
-                        <div>
-                            <label class="block text-[9px] font-extrabold text-slate-400 uppercase tracking-[0.2em] mb-2 ml-1">E-mail de Acesso</label>
-                            <input type="email" name="email" required placeholder="exemplo@inamet.gov.ao" 
-                                   class="input-field w-full px-5 py-4 rounded-2xl bg-slate-50 text-sm text-slate-700">
-                        </div>
-                        
-                        <button type="submit" class="btn-primary w-full text-white py-4 rounded-2xl font-bold uppercase tracking-[0.15em] text-xs shadow-lg">
-                            Verificar Utilizador
-                        </button>
-                    </form>
-
-                    <div class="mt-8 pt-6 border-t border-slate-50 text-center flex flex-col gap-2">
-                        <a href="/login" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-blue-600 transition">
-                            ← Voltar ao Portal de Login
-                        </a>
-                    </div>
-                </div>
-            </main>
-        </body>
-        </html>
-    `);
-});
-
-// ROTA POST: Processa o pedido de recuperação
-app.post('/recuperar-senha', (req, res) => {
-    const { email } = req.body;
-
-    db.get(`SELECT id, nome FROM usuarios WHERE email = ?`, [email], (err, user) => {
-        if (err || !user) {
-            return res.send(renderError('Utilizador Inválido', 'Este e-mail não pertence a nenhum funcionário do INAMET.', 'error'));
-        }
-
-        // Se o usuário existe, redirecionamos para a página de trocar senha 
-        // Passamos o ID via query string para saber QUEM está trocando (em produção usaríamos um TOKEN seguro)
-        res.redirect(`/nova-senha?id=${user.id}`);
-    });
-});
-
-
-app.get('/nova-senha', (req, res) => {
-    const userId = req.query.id;
-    if (!userId) return res.redirect('/login');
-
-    res.send(`
-        <!DOCTYPE html>
-        <html lang="pt">
-        <head>
-            <meta charset="UTF-8">
-            <script src="https://cdn.tailwindcss.com"></script>
-            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
-            <title>INAMET | Nova Senha</title>
-        </head>
-        <body class="bg-white font-sans flex items-center justify-center h-screen">
-            ${headerPadrao}
-            <div class="w-full max-w-[440px] p-8 border border-slate-100 shadow-2xl rounded-[3rem] animate__animated animate__fadeIn">
-                <h2 class="text-2xl font-800 text-slate-800 mb-6 text-center">DEFINIR <span class="text-blue-700">NOVA SENHA</span></h2>
-                <form action="/atualizar-senha" method="POST" class="space-y-4">
-                    <input type="hidden" name="userId" value="${userId}">
-                    <div>
-                        <label class="block text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-1 ml-1">Nova Palavra-passe</label>
-                        <input type="password" name="novaSenha" required placeholder="••••••••" class="w-full px-5 py-3.5 rounded-2xl bg-slate-50 border border-slate-100 focus:border-blue-600 outline-none transition-all">
-                    </div>
-                    <button type="submit" class="w-full bg-blue-700 text-white py-4 rounded-2xl font-bold uppercase text-xs tracking-widest shadow-lg hover:bg-blue-800 transition-all">Atualizar Senha</button>
-                </form>
             </div>
         </body>
         </html>
     `);
 });
 
-
-app.post('/atualizar-senha', async (req, res) => {
-    const { userId, novaSenha } = req.body;
-
-    // 1. Validação imediata
-    if (!novaSenha || novaSenha.length < 6) {
-        return res.send(renderError('Segurança', 'A senha deve ter pelo menos 6 caracteres.', 'warning'));
+// --- 6. DASHBOARD (PROJETADO PARA O OTINIEL E EQUIPA) ---
+app.get('/dashboard', (req, res) => {
+    // PROTEÇÃO: Se não houver utilizador na sessão, manda para o Login
+    if (!req.session.user) {
+        return res.redirect('/login');
     }
 
-    try {
-        // 2. Buscar usuário (Usamos uma Promise para evitar o "limbo" do callback)
-        db.get(`SELECT senha FROM usuarios WHERE id = ?`, [userId], async (err, user) => {
-            if (err) {
-                return res.send(renderError('Erro de Banco', 'Erro ao consultar base de dados.', 'error'));
+    const usuario = req.session.user;
+
+    // Buscamos os ficheiros do departamento do utilizador logado ou Gerais
+    db.all(`SELECT * FROM ficheiros WHERE departamento = ? OR departamento = 'Geral'`, 
+    [usuario.departamento], (err, ficheiros) => {
+        if (err) return res.send("Erro ao carregar ficheiros.");
+
+        // Renderizamos o Dashboard passando os dados REAIS da sessão
+        const html = renderDashboard(usuario, ficheiros, req.query); 
+        res.send(html);
+    });
+});
+
+// --- 7. PROCESSAR UPLOAD DE FICHEIROS ---
+app.post('/upload', upload.single('ficheiro'), (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+    if (!req.file) return res.status(400).send("Nenhum ficheiro selecionado.");
+
+    const { nome_exibicao, departamento } = req.body;
+    const usuario_id = req.session.user.id;
+    const nome_original = nome_exibicao || req.file.originalname;
+    const nome_servidor = req.file.filename;
+
+    const sql = `INSERT INTO ficheiros (nome_original, nome_servidor, departamento, usuario_id) 
+                 VALUES (?, ?, ?, ?)`;
+
+    db.run(sql, [nome_original, nome_servidor, departamento, usuario_id], function(err) {
+        if (err) return res.status(500).send("Erro ao gravar na base de dados.");
+        res.redirect('/dashboard');
+    });
+});
+
+// --- 8. TORNAR CHEFE (ADMIN) ---
+app.post('/tornar-chefe', (req, res) => {
+    const { codigo_secreto, usuario_id } = req.body;
+    const CODIGO_DE_TI = "1234"; 
+
+    if (codigo_secreto === CODIGO_DE_TI) {
+        db.run(`UPDATE usuarios SET cargo = 'admin' WHERE id = ?`, [usuario_id], (err) => {
+            if (err) return res.send("Erro ao atualizar cargo.");
+            // Atualizamos a sessão também para o utilizador ver as mudanças na hora
+            if (req.session.user && req.session.user.id == usuario_id) {
+                req.session.user.cargo = 'admin';
             }
-            if (!user) {
-                return res.send(renderError('Utilizador Inválido', 'O link de recuperação expirou ou é inválido.', 'error'));
-            }
-
-            // 3. Verificar se a senha é igual à antiga
-            const senhasIguais = await bcrypt.compare(novaSenha, user.senha);
-            if (senhasIguais) {
-                return res.send(renderError('Regra de Segurança', 'A nova senha não pode ser igual à anterior.', 'warning'));
-            }
-
-            // 4. Se for diferente, gerar novo Hash
-            const novoHash = await bcrypt.hash(novaSenha, 10);
-
-            // 5. Executar o UPDATE
-            db.run(`UPDATE usuarios SET senha = ? WHERE id = ?`, [novoHash, userId], function(updateErr) {
-                if (updateErr) {
-                    return res.send(renderError('Erro na Gravação', 'Não foi possível salvar a nova senha.', 'error'));
-                }
-
-                // 6. RESPOSTA FINAL - Forçamos o envio do HTML com SweetAlert
-                // Se chegar aqui, não tem como ficar em branco.
-                return res.send(`
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-                        <script src="https://cdn.tailwindcss.com"></script>
-                        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
-                    </head>
-                    <body class="bg-slate-50 font-sans">
-                        <script>
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'SENHA ATUALIZADA',
-                                text: 'Credenciais do INAMET redefinidas com sucesso.',
-                                confirmButtonColor: '#1d4ed8',
-                                confirmButtonText: 'Aceder ao Login',
-                                allowOutsideClick: false
-                            }).then((result) => {
-                                if (result.isConfirmed) {
-                                    window.location.href = '/login';
-                                }
-                            });
-                        </script>
-                    </body>
-                    </html>
-                `);
-            });
+            res.redirect('/dashboard');
         });
-    } catch (error) {
-        console.error("Erro no Servidor:", error);
-        return res.send(renderError('Erro Fatal', 'Ocorreu um erro interno no servidor.', 'error'));
+    } else {
+        res.redirect('/dashboard?erro=1');
     }
 });
 
-app.listen(3000, () => console.log("Servidor rodando em http://localhost:3000"));
+// --- 9. LOGOUT (SAIR DO SISTEMA) ---
+app.get('/logout', (req, res) => {
+    req.session.destroy();
+    res.redirect('/');
+});
+
+app.listen(3000, () => console.log("Servidor INAMET rodando em http://localhost:3000"));
