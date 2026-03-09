@@ -352,6 +352,71 @@ app.get('/registo', (req, res) => {
     `);
 });
 
+app.post('/registo', async (req, res) => {
+    const { nome, email, senha, departamento } = req.body;
+
+    try {
+        const hash = await bcrypt.hash(senha, 10);
+        
+        db.run(`INSERT INTO usuarios (nome, email, senha, departamento) VALUES (?, ?, ?, ?)`, 
+        [nome, email, hash, departamento], (err) => {
+            
+            if (err) {
+                // Se cair aqui, é o erro que viste no terminal (e-mail duplicado)
+                console.error("ERRO DETECTADO:", err.message);
+                
+                return res.send(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+                        <script src="https://cdn.tailwindcss.com"></script>
+                    </head>
+                    <body class="bg-slate-50">
+                        <script>
+                            Swal.fire({
+                                icon: 'warning',
+                                title: 'Utilizador já Registado',
+                                text: 'Este e-mail (${email}) já possui uma conta no INAMET. Tente fazer login ou recuperar a senha.',
+                                confirmButtonColor: '#1d4ed8',
+                                confirmButtonText: 'Ir para Login'
+                            }).then(() => {
+                                window.location.href = '/login';
+                            });
+                        </script>
+                    </body>
+                    </html>
+                `);
+            }
+
+            // Se NÃO houver erro, faz o cadastro normal
+            return res.send(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+                    <script src="https://cdn.tailwindcss.com"></script>
+                </head>
+                <body class="bg-slate-50">
+                    <script>
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Cadastro Realizado!',
+                            text: 'Bem-vindo ao sistema, ${nome}.',
+                            confirmButtonColor: '#1d4ed8'
+                        }).then(() => {
+                            window.location.href = '/login';
+                        });
+                    </script>
+                </body>
+                </html>
+            `);
+        });
+    } catch (e) {
+        res.send(renderError('Erro', 'Falha no servidor', 'error'));
+    }
+});
+
 // --- 6. LOGICA POST ---
 app.post('/login', (req, res) => {
     const { email, senha } = req.body;
@@ -379,6 +444,181 @@ app.post('/registo', async (req, res) => {
         }
         res.send(`<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script><script>Swal.fire({ icon: 'success', title: 'Concluído!', text: 'Já pode fazer login.', confirmButtonColor: '#1d4ed8' }).then(() => { window.location.href = '/login'; });</script>`);
     });
+});
+
+
+
+app.get('/recuperar-senha', (req, res) => {
+    res.send(`
+        <!DOCTYPE html>
+        <html lang="pt">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <script src="https://cdn.tailwindcss.com"></script>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+            <title>INAMET | Recuperar Acesso</title>
+            <style>
+                body { font-family: 'Inter', sans-serif; overflow: hidden; }
+                .glass-card { background: #ffffff; border: 1px solid #f1f5f9; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05); }
+                .input-field { transition: all 0.2s ease; border: 1.5px solid #f1f5f9; }
+                .input-field:focus { border-color: #2563eb; background: white; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1); outline: none; }
+                .btn-primary { background-color: #1d4ed8; transition: all 0.3s ease; }
+                .btn-primary:hover { background-color: #1e40af; transform: translateY(-1px); }
+            </style>
+        </head>
+        <body class="bg-white antialiased">
+            ${headerPadrao}
+            <main class="h-screen w-full flex flex-col items-center justify-center px-6 overflow-hidden">
+                <div class="w-full max-w-[440px] glass-card rounded-[3rem] p-10 animate__animated animate__fadeInUp">
+                    <div class="mb-8 text-center">
+                        <div class="w-16 h-16 bg-blue-50 text-blue-700 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4">🔑</div>
+                        <h2 class="text-3xl font-800 text-slate-800 tracking-tighter uppercase">Recuperar <span class="text-blue-700">Senha</span></h2>
+                        <p class="text-[11px] text-slate-500 font-medium mt-2 px-6 leading-relaxed">
+                            Insira o seu e-mail institucional para identificarmos a sua conta no sistema.
+                        </p>
+                    </div>
+                    
+                    <form action="/recuperar-senha" method="POST" class="space-y-6">
+                        <div>
+                            <label class="block text-[9px] font-extrabold text-slate-400 uppercase tracking-[0.2em] mb-2 ml-1">E-mail de Acesso</label>
+                            <input type="email" name="email" required placeholder="exemplo@inamet.gov.ao" 
+                                   class="input-field w-full px-5 py-4 rounded-2xl bg-slate-50 text-sm text-slate-700">
+                        </div>
+                        
+                        <button type="submit" class="btn-primary w-full text-white py-4 rounded-2xl font-bold uppercase tracking-[0.15em] text-xs shadow-lg">
+                            Verificar Utilizador
+                        </button>
+                    </form>
+
+                    <div class="mt-8 pt-6 border-t border-slate-50 text-center flex flex-col gap-2">
+                        <a href="/login" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-blue-600 transition">
+                            ← Voltar ao Portal de Login
+                        </a>
+                    </div>
+                </div>
+            </main>
+        </body>
+        </html>
+    `);
+});
+
+// ROTA POST: Processa o pedido de recuperação
+app.post('/recuperar-senha', (req, res) => {
+    const { email } = req.body;
+
+    db.get(`SELECT id, nome FROM usuarios WHERE email = ?`, [email], (err, user) => {
+        if (err || !user) {
+            return res.send(renderError('Utilizador Inválido', 'Este e-mail não pertence a nenhum funcionário do INAMET.', 'error'));
+        }
+
+        // Se o usuário existe, redirecionamos para a página de trocar senha 
+        // Passamos o ID via query string para saber QUEM está trocando (em produção usaríamos um TOKEN seguro)
+        res.redirect(`/nova-senha?id=${user.id}`);
+    });
+});
+
+
+app.get('/nova-senha', (req, res) => {
+    const userId = req.query.id;
+    if (!userId) return res.redirect('/login');
+
+    res.send(`
+        <!DOCTYPE html>
+        <html lang="pt">
+        <head>
+            <meta charset="UTF-8">
+            <script src="https://cdn.tailwindcss.com"></script>
+            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
+            <title>INAMET | Nova Senha</title>
+        </head>
+        <body class="bg-white font-sans flex items-center justify-center h-screen">
+            ${headerPadrao}
+            <div class="w-full max-w-[440px] p-8 border border-slate-100 shadow-2xl rounded-[3rem] animate__animated animate__fadeIn">
+                <h2 class="text-2xl font-800 text-slate-800 mb-6 text-center">DEFINIR <span class="text-blue-700">NOVA SENHA</span></h2>
+                <form action="/atualizar-senha" method="POST" class="space-y-4">
+                    <input type="hidden" name="userId" value="${userId}">
+                    <div>
+                        <label class="block text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mb-1 ml-1">Nova Palavra-passe</label>
+                        <input type="password" name="novaSenha" required placeholder="••••••••" class="w-full px-5 py-3.5 rounded-2xl bg-slate-50 border border-slate-100 focus:border-blue-600 outline-none transition-all">
+                    </div>
+                    <button type="submit" class="w-full bg-blue-700 text-white py-4 rounded-2xl font-bold uppercase text-xs tracking-widest shadow-lg hover:bg-blue-800 transition-all">Atualizar Senha</button>
+                </form>
+            </div>
+        </body>
+        </html>
+    `);
+});
+
+
+app.post('/atualizar-senha', async (req, res) => {
+    const { userId, novaSenha } = req.body;
+
+    // 1. Validação imediata
+    if (!novaSenha || novaSenha.length < 6) {
+        return res.send(renderError('Segurança', 'A senha deve ter pelo menos 6 caracteres.', 'warning'));
+    }
+
+    try {
+        // 2. Buscar usuário (Usamos uma Promise para evitar o "limbo" do callback)
+        db.get(`SELECT senha FROM usuarios WHERE id = ?`, [userId], async (err, user) => {
+            if (err) {
+                return res.send(renderError('Erro de Banco', 'Erro ao consultar base de dados.', 'error'));
+            }
+            if (!user) {
+                return res.send(renderError('Utilizador Inválido', 'O link de recuperação expirou ou é inválido.', 'error'));
+            }
+
+            // 3. Verificar se a senha é igual à antiga
+            const senhasIguais = await bcrypt.compare(novaSenha, user.senha);
+            if (senhasIguais) {
+                return res.send(renderError('Regra de Segurança', 'A nova senha não pode ser igual à anterior.', 'warning'));
+            }
+
+            // 4. Se for diferente, gerar novo Hash
+            const novoHash = await bcrypt.hash(novaSenha, 10);
+
+            // 5. Executar o UPDATE
+            db.run(`UPDATE usuarios SET senha = ? WHERE id = ?`, [novoHash, userId], function(updateErr) {
+                if (updateErr) {
+                    return res.send(renderError('Erro na Gravação', 'Não foi possível salvar a nova senha.', 'error'));
+                }
+
+                // 6. RESPOSTA FINAL - Forçamos o envio do HTML com SweetAlert
+                // Se chegar aqui, não tem como ficar em branco.
+                return res.send(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+                        <script src="https://cdn.tailwindcss.com"></script>
+                        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+                    </head>
+                    <body class="bg-slate-50 font-sans">
+                        <script>
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'SENHA ATUALIZADA',
+                                text: 'Credenciais do INAMET redefinidas com sucesso.',
+                                confirmButtonColor: '#1d4ed8',
+                                confirmButtonText: 'Aceder ao Login',
+                                allowOutsideClick: false
+                            }).then((result) => {
+                                if (result.isConfirmed) {
+                                    window.location.href = '/login';
+                                }
+                            });
+                        </script>
+                    </body>
+                    </html>
+                `);
+            });
+        });
+    } catch (error) {
+        console.error("Erro no Servidor:", error);
+        return res.send(renderError('Erro Fatal', 'Ocorreu um erro interno no servidor.', 'error'));
+    }
 });
 
 app.listen(3000, () => console.log("Servidor rodando em http://localhost:3000"));
