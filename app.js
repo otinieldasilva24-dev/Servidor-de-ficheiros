@@ -1,4 +1,4 @@
-const { headerPadrao, renderDashboard, renderError } = require('./utils/renders');
+const { renderDashboard, renderPerfil, renderError, renderGestaoUtilizadores, headerPadrao } = require('./utils/renders');
 const express = require('express');
 const session = require('express-session');
 const db = require('./config/database');
@@ -168,66 +168,255 @@ app.get('/suporte', (req, res) => {
 
 // --- 6. DASHBOARD (PROJETADO PARA O OTINIEL E EQUIPA) ---
 app.get('/dashboard', (req, res) => {
-    // PROTEÇÃO: Se não houver utilizador na sessão, manda para o Login
-    if (!req.session.user) {
-        return res.redirect('/login');
+    // 1. Pegar os dados reais do utilizador que está na sessão
+    const user = req.session.user; 
+
+    if (!user) {
+        return res.redirect('/login'); // Se não houver user real, volta ao login
     }
 
-    const usuario = req.session.user;
+    // 2. Consulta real à base de dados para os ficheiros
+    const query = "SELECT * FROM ficheiros WHERE departamento = ?";
+    
+    db.all(query, [user.departamento], (err, files) => {
+        if (err) {
+            console.error("Erro na BD:", err);
+            return res.status(500).send("Erro ao carregar dados reais.");
+        }
 
-    // Buscamos os ficheiros do departamento do utilizador logado ou Gerais
-    db.all(`SELECT * FROM ficheiros WHERE departamento = ? OR departamento = 'Geral'`, 
-    [usuario.departamento], (err, ficheiros) => {
-        if (err) return res.send("Erro ao carregar ficheiros.");
+        // 3. Configurar UTF-8 para evitar o erro de "ecrÃ£"
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
 
-        // Renderizamos o Dashboard passando os dados REAIS da sessão
-        const html = renderDashboard(usuario, ficheiros, req.query); 
-        res.send(html);
+        // 4. Enviar para o renders.js (O user agora está definido aqui dentro!)
+        res.send(renderDashboard(user, files));
     });
 });
 
 // --- 7. PROCESSAR UPLOAD DE FICHEIROS ---
 app.post('/upload', upload.single('ficheiro'), (req, res) => {
-    if (!req.session.user) return res.redirect('/login');
-    if (!req.file) return res.status(400).send("Nenhum ficheiro selecionado.");
+    if (!req.file || !req.session.user) return res.send("Erro: Utilizador não autenticado ou ficheiro ausente.");
 
-    const { nome_exibicao, departamento } = req.body;
-    const usuario_id = req.session.user.id;
-    const nome_original = nome_exibicao || req.file.originalname;
-    const nome_servidor = req.file.filename;
+    const nomeOriginal = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+    const userId = req.session.user.id; // PEGANDO O ID DO USER DA SESSÃO
 
-    const sql = `INSERT INTO ficheiros (nome_original, nome_servidor, departamento, usuario_id) 
-                 VALUES (?, ?, ?, ?)`;
+    // Adicionada a coluna usuario_id no INSERT
+    const sql = "INSERT INTO ficheiros (nome_original, nome_servidor, departamento, usuario_id, data_upload) VALUES (?, ?, ?, ?, ?)";
+    const params = [nomeOriginal, req.file.filename, req.body.departamento, userId, new Date().toISOString()];
 
-    db.run(sql, [nome_original, nome_servidor, departamento, usuario_id], function(err) {
-        if (err) return res.status(500).send("Erro ao gravar na base de dados.");
+    db.run(sql, params, (err) => {
+        if (err) {
+            console.error("Erro ao guardar no banco:", err.message);
+            return res.send("Erro ao guardar na BD");
+        }
         res.redirect('/dashboard');
     });
 });
 
 // --- 8. TORNAR CHEFE (ADMIN) ---
 app.post('/tornar-chefe', (req, res) => {
-    const { codigo_secreto, usuario_id } = req.body;
-    const CODIGO_DE_TI = "1234"; 
+    const { codigo_secreto } = req.body;
+    const user = req.session.user;
 
-    if (codigo_secreto === CODIGO_DE_TI) {
-        db.run(`UPDATE usuarios SET cargo = 'admin' WHERE id = ?`, [usuario_id], (err) => {
-            if (err) return res.send("Erro ao atualizar cargo.");
-            // Atualizamos a sessão também para o utilizador ver as mudanças na hora
-            if (req.session.user && req.session.user.id == usuario_id) {
-                req.session.user.cargo = 'admin';
-            }
+    // DEFINA AQUI O SEU CÓDIGO REAL (Exemplo: '1234')
+    const CODIGO_CORRETO = '1234'; 
+
+    if (!user) return res.redirect('/login');
+
+    if (codigo_secreto === CODIGO_CORRETO) {
+        // CASO CERTO: Atualiza a sessão e volta à dashboard
+        req.session.user.cargo = 'admin';
+        
+        // Garantir que a sessão é gravada antes do redirect
+        req.session.save(() => {
             res.redirect('/dashboard');
         });
     } else {
-        res.redirect('/dashboard?erro=1');
+        // CASO ERRADO: Usa a função renderError do teu renders.js
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        const htmlErro = renderError(
+            'Acesso Negado', 
+            'O código secreto inserido está incorreto. Tenta novamente.', 
+            'error'
+        );
+        res.send(htmlErro);
     }
 });
 
-// --- 9. LOGOUT (SAIR DO SISTEMA) ---
-app.get('/logout', (req, res) => {
-    req.session.destroy();
-    res.redirect('/');
+// --- ROTA: SAIR DO MODO CHEFE (VOLTAR A UTILIZADOR COMUM) ---
+app.get('/sair-modo-chefe', (req, res) => {
+    // 1. Verificar se existe um utilizador na sessão
+    if (!req.session.user) return res.redirect('/login');
+
+    const userId = req.session.user.id;
+
+    // 2. Atualizar permanentemente na Base de Dados para 'comum'
+    const sql = "UPDATE usuarios SET cargo = 'comum' WHERE id = ?";
+    
+    db.run(sql, [userId], function(err) {
+        if (err) {
+            console.error("Erro ao sair do modo chefe:", err.message);
+            return res.send(renderError("Erro", "Não foi possível alterar o cargo.", "error"));
+        }
+
+        // 3. Atualizar a SESSÃO para 'comum'
+        // Isso remove imediatamente os botões de "Eliminar" e "Equipa" da Dashboard
+        req.session.user.cargo = 'comum';
+
+        // 4. Gravar a sessão e redirecionar para a Dashboard limpa
+        req.session.save(() => {
+            res.redirect('/dashboard');
+        });
+    });
+});
+
+app.get('/admin/alterar-cargo/:id/:novoCargo', (req, res) => {
+    // 1. Verificação de segurança
+    if (!req.session.user || req.session.user.cargo !== 'admin') {
+        return res.send(renderError("Acesso Negado", "Não tens permissão.", "error"));
+    }
+
+    const idParaAlterar = req.params.id; 
+    const novoCargo = req.params.novoCargo;
+
+    const sql = "UPDATE usuarios SET cargo = ? WHERE id = ?";
+    
+    // ATENÇÃO: Usamos 'function(err)' e NÃO '(err) =>' para o 'this.changes' funcionar
+    db.run(sql, [novoCargo, idParaAlterar], function(err) {
+        if (err) {
+            console.error("❌ Erro SQL:", err.message);
+            return res.send(renderError("Erro", err.message, "error"));
+        }
+
+        // Se this.changes for 0, o ID não existe na BD
+        if (this.changes === 0) {
+            return res.send(renderError("Utilizador não encontrado", `O ID ${idParaAlterar} não foi achado no banco de dados.`, "error"));
+        }
+
+        console.log(`✅ Sucesso: Utilizador ${idParaAlterar} agora é ${novoCargo}`);
+        res.redirect('/admin/utilizadores');
+    });
+});
+
+// Rota para eliminar ficheiro
+app.get('/eliminar/:id', (req, res) => {
+    const user = req.session.user;
+
+    // 1. Verificação de Permissão: Apenas chefes (admin)
+    if (!user || user.cargo !== 'admin') {
+        return res.send(renderError("Acesso Negado", "Apenas chefes podem eliminar ficheiros.", "error"));
+    }
+
+    // 2. Procurar o ficheiro no banco para saber o nome real no servidor
+    db.get(`SELECT nome_servidor FROM ficheiros WHERE id = ?`, [req.params.id], (err, row) => {
+        if (err || !row) return res.redirect('/dashboard');
+
+        const filePath = path.join(__dirname, 'uploads', row.nome_servidor);
+
+        // 3. Eliminar o registo da Base de Dados
+        db.run(`DELETE FROM ficheiros WHERE id = ?`, [req.params.id], (err) => {
+            if (err) return res.send(renderError("Erro", "Não foi possível eliminar o registo.", "error"));
+
+            // 4. Eliminar o ficheiro físico da pasta 'uploads'
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+
+            res.redirect('/dashboard');
+        });
+    });
+});
+
+app.get('/perfil', (req, res) => {
+    const user = req.session.user;
+    if (!user) return res.redirect('/login');
+
+    // Consulta real para contar uploads do usuário
+    const sqlUploads = "SELECT COUNT(*) as total FROM ficheiros WHERE usuario_id = ?";
+    
+    db.get(sqlUploads, [user.id], (err, row) => {
+        const totalUploads = row ? row.total : 0;
+        
+        const estatisticas = {
+            uploads: totalUploads
+        };
+
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        // Chamando a função que estilizamos anteriormente
+        res.send(renderPerfil(user, estatisticas));
+    });
+});
+
+app.post('/perfil/atualizar', (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+
+    const { nome, password } = req.body;
+    const userId = req.session.user.id;
+
+    let sql;
+    let params;
+
+    // Se o usuário digitou algo no campo de senha, atualizamos ambos
+    if (password && password.trim() !== "") {
+        sql = "UPDATE usuarios SET nome = ?, password = ? WHERE id = ?";
+        params = [nome, password, userId];
+    } else {
+        // Se a senha estiver vazia, atualizamos apenas o nome
+        sql = "UPDATE usuarios SET nome = ? WHERE id = ?";
+        params = [nome, userId];
+    }
+
+    db.run(sql, params, function(err) {
+        if (err) {
+            console.error("Erro ao atualizar perfil:", err.message);
+            return res.send(renderError("Erro", "Não foi possível atualizar os dados.", "error"));
+        }
+
+        // Atualizamos o nome na sessão para refletir no Header imediatamente
+        req.session.user.nome = nome;
+
+        req.session.save(() => {
+            res.send(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+                </head>
+                <body style="font-family: sans-serif;">
+                    <script>
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'PERFIL ATUALIZADO',
+                            text: 'As tuas informações no INAMET foram guardadas!',
+                            confirmButtonColor: '#1d4ed8'
+                        }).then(() => { window.location.href = '/perfil'; });
+                    </script>
+                </body>
+                </html>
+            `);
+        });
+    });
+});
+
+// ROTA: Listar todos os utilizadores para gestão
+app.get('/admin/utilizadores', (req, res) => {
+    // 1. Bloqueio de Segurança: Só admins entram aqui
+    if (!req.session.user || req.session.user.cargo !== 'admin') {
+        return res.send(renderError("Acesso Negado", "Esta área é restrita aos Chefes de Departamento.", "error"));
+    }
+
+    // 2. Procurar todos os utilizadores no SQLite
+    const sql = "SELECT id, nome, departamento, cargo FROM usuarios ORDER BY nome ASC";
+
+    db.all(sql, [], (err, rows) => {
+        if (err) {
+            console.error("Erro ao listar utilizadores:", err.message);
+            return res.send(renderError("Erro Crítico", "Não foi possível carregar a lista de utilizadores.", "error"));
+        }
+
+        // 3. Enviar os dados para a função de renderização
+        res.send(renderGestaoUtilizadores(rows));
+    });
 });
 
 app.listen(3000, () => console.log("Servidor INAMET rodando em http://localhost:3000"));
