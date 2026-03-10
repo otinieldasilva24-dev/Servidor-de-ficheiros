@@ -192,23 +192,38 @@ app.get('/dashboard', (req, res) => {
     });
 });
 
-// --- 7. PROCESSAR UPLOAD DE FICHEIROS ---
+// --- 7. PROCESSAR UPLOAD DE FICHEIROS (COM REGISTO DE LOG) ---
 app.post('/upload', upload.single('ficheiro'), (req, res) => {
     if (!req.file || !req.session.user) return res.send("Erro: Utilizador não autenticado ou ficheiro ausente.");
 
     const nomeOriginal = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
-    const userId = req.session.user.id; // PEGANDO O ID DO USER DA SESSÃO
+    const user = req.session.user; // Facilitar o acesso aos dados do user
+    const agora = new Date();
 
-    // Adicionada a coluna usuario_id no INSERT
-    const sql = "INSERT INTO ficheiros (nome_original, nome_servidor, departamento, usuario_id, data_upload) VALUES (?, ?, ?, ?, ?)";
-    const params = [nomeOriginal, req.file.filename, req.body.departamento, userId, new Date().toISOString()];
+    // Passo A: Inserir o ficheiro na tabela de ficheiros (Como já tinhas)
+    const sqlFicheiro = "INSERT INTO ficheiros (nome_original, nome_servidor, departamento, usuario_id, data_upload) VALUES (?, ?, ?, ?, ?)";
+    const paramsFicheiro = [nomeOriginal, req.file.filename, req.body.departamento, user.id, agora.toISOString()];
 
-    db.run(sql, params, (err) => {
+    db.run(sqlFicheiro, paramsFicheiro, function(err) {
         if (err) {
-            console.error("Erro ao guardar no banco:", err.message);
+            console.error("Erro ao guardar ficheiro:", err.message);
             return res.send("Erro ao guardar na BD");
         }
-        res.redirect('/dashboard');
+
+        // Passo B: ESCREVER O LOG (A parte nova para o Admin)
+        // Criamos os dados formatados para Angola (pt-AO)
+        const dataLog = agora.toLocaleDateString('pt-AO');
+        const horaLog = agora.toLocaleTimeString('pt-AO', { hour: '2-digit', minute: '2-digit' });
+
+        const sqlLog = "INSERT INTO logs_atividade (usuario_nome, acao, ficheiro_nome, data_formatada, hora) VALUES (?, ?, ?, ?, ?)";
+        const paramsLog = [user.nome, 'UPLOAD', nomeOriginal, dataLog, horaLog];
+
+        db.run(sqlLog, paramsLog, (errLog) => {
+            if (errLog) console.error("⚠️ Erro ao gravar Log de Upload:", errLog.message);
+            
+            // Redireciona apenas após tentar gravar o log
+            res.redirect('/dashboard');
+        });
     });
 });
 
@@ -346,76 +361,160 @@ app.get('/perfil', (req, res) => {
     });
 });
 
-app.post('/perfil/atualizar', (req, res) => {
+const bcrypt = require('bcrypt'); // Garante que isto está no topo do app.js
+
+app.post('/perfil/atualizar', async (req, res) => {
     if (!req.session.user) return res.redirect('/login');
 
-    const { nome, password } = req.body;
+    const { nome, password } = req.body; // 'password' vem do nome do campo no teu HTML
     const userId = req.session.user.id;
 
-    let sql;
-    let params;
-
-    // Se o usuário digitou algo no campo de senha, atualizamos ambos
-    if (password && password.trim() !== "") {
-        sql = "UPDATE usuarios SET nome = ?, password = ? WHERE id = ?";
-        params = [nome, password, userId];
-    } else {
-        // Se a senha estiver vazia, atualizamos apenas o nome
-        sql = "UPDATE usuarios SET nome = ? WHERE id = ?";
-        params = [nome, userId];
-    }
-
-    db.run(sql, params, function(err) {
+    // 1. Procurar os dados atuais usando a coluna correta 'senha'
+    db.get("SELECT senha FROM usuarios WHERE id = ?", [userId], async (err, row) => {
         if (err) {
-            console.error("Erro ao atualizar perfil:", err.message);
-            return res.send(renderError("Erro", "Não foi possível atualizar os dados.", "error"));
+            console.error("❌ ERRO BD SELECT:", err.message);
+            return res.send(renderError("Erro", "Erro ao aceder à base de dados.", "error"));
         }
 
-        // Atualizamos o nome na sessão para refletir no Header imediatamente
-        req.session.user.nome = nome;
+        let sql;
+        let params;
+        let mensagemSucesso = "As tuas informações foram guardadas!";
 
-        req.session.save(() => {
-            res.send(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="UTF-8">
-                    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-                </head>
-                <body style="font-family: sans-serif;">
-                    <script>
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'PERFIL ATUALIZADO',
-                            text: 'As tuas informações no INAMET foram guardadas!',
-                            confirmButtonColor: '#1d4ed8'
-                        }).then(() => { window.location.href = '/perfil'; });
-                    </script>
-                </body>
-                </html>
-            `);
-        });
+        try {
+            // Caso o usuário queira mudar a senha
+            if (password && password.trim() !== "") {
+                
+                // Validação de tamanho
+                if (password.length < 6) {
+                    return res.send(renderError("Senha Curta", "A nova palavra-passe deve ter pelo menos 6 caracteres.", "warning"));
+                }
+
+                // Comparação usando BCRYPT (como a senha na BD é um hash)
+                const senhasIguais = await bcrypt.compare(password, row.senha);
+                if (senhasIguais) {
+                    return res.send(renderError("Atenção", "A nova palavra-passe não pode ser igual à atual.", "info"));
+                }
+
+                // Gerar novo Hash para segurança
+                const novoHash = await bcrypt.hash(password, 10);
+                sql = "UPDATE usuarios SET nome = ?, senha = ? WHERE id = ?";
+                params = [nome, novoHash, userId];
+                mensagemSucesso = "Perfil e Palavra-Passe atualizados com sucesso!";
+            } else {
+                // Atualiza apenas o nome
+                sql = "UPDATE usuarios SET nome = ? WHERE id = ?";
+                params = [nome, userId];
+            }
+
+            // 2. Executar a atualização final
+            db.run(sql, params, function(err) {
+                if (err) {
+                    console.error("❌ ERRO SQL UPDATE:", err.message);
+                    return res.send(renderError("Erro", "Não foi possível atualizar os dados.", "error"));
+                }
+
+                // Atualizar nome na sessão para refletir no header
+                req.session.user.nome = nome;
+
+                req.session.save(() => {
+                    res.send(`
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <meta charset="UTF-8">
+                            <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+                        </head>
+                        <body>
+                            <script>
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'SUCESSO',
+                                    text: '${mensagemSucesso}',
+                                    confirmButtonColor: '#1d4ed8'
+                                }).then(() => { window.location.href = '/perfil'; });
+                            </script>
+                        </body>
+                        </html>
+                    `);
+                });
+            });
+        } catch (e) {
+            res.send(renderError("Erro", "Erro ao processar segurança da senha.", "error"));
+        }
     });
 });
 
-// ROTA: Listar todos os utilizadores para gestão
+// ROTA: Listar utilizadores E registos de atividade para o Chefe
 app.get('/admin/utilizadores', (req, res) => {
-    // 1. Bloqueio de Segurança: Só admins entram aqui
+    // 1. Bloqueio de Segurança
     if (!req.session.user || req.session.user.cargo !== 'admin') {
         return res.send(renderError("Acesso Negado", "Esta área é restrita aos Chefes de Departamento.", "error"));
     }
 
-    // 2. Procurar todos os utilizadores no SQLite
-    const sql = "SELECT id, nome, departamento, cargo FROM usuarios ORDER BY nome ASC";
+    // 2. Primeira Consulta: Lista de Membros
+    const sqlUsers = "SELECT id, nome, departamento, cargo FROM usuarios ORDER BY nome ASC";
 
-    db.all(sql, [], (err, rows) => {
-        if (err) {
-            console.error("Erro ao listar utilizadores:", err.message);
-            return res.send(renderError("Erro Crítico", "Não foi possível carregar a lista de utilizadores.", "error"));
-        }
+    db.all(sqlUsers, [], (err, users) => {
+        if (err) return res.send(renderError("Erro", "Falha ao carregar utilizadores.", "error"));
 
-        // 3. Enviar os dados para a função de renderização
-        res.send(renderGestaoUtilizadores(rows));
+        // 3. Segunda Consulta: Últimos 15 registos de atividade
+        // Usamos ORDER BY id DESC para que os mais recentes apareçam no topo
+        const sqlLogs = "SELECT * FROM logs_atividade ORDER BY id DESC LIMIT 15";
+
+        db.all(sqlLogs, [], (errLogs, logs) => {
+            if (errLogs) {
+                console.error("Erro ao carregar logs:", errLogs.message);
+                // Se os logs falharem, ainda enviamos a página, mas com lista de logs vazia []
+            }
+
+            // 4. Enviar tudo para o renderizador
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.send(renderGestaoUtilizadores(users, logs || []));
+        });
+    });
+});
+
+app.get('/logout', (req, res) => {
+    // 1. Destruir a sessão (se usar express-session)
+    if (req.session) {
+        req.session.destroy();
+    }
+    // 2. Limpar o cookie do navegador
+    res.clearCookie('connect.sid'); 
+    // 3. Mandar para a página de login
+    res.redirect('/login');
+});
+
+// Rota para baixar ficheiro e registar a ação para o Admin
+app.get('/download/:id', (req, res) => {
+    const user = req.session.user;
+    if (!user) return res.redirect('/login');
+
+    const ficheiroId = req.params.id;
+
+    // 1. Procurar os dados do ficheiro na BD
+    db.get("SELECT nome_original, nome_servidor FROM ficheiros WHERE id = ?", [ficheiroId], (err, row) => {
+        if (err || !row) return res.status(404).send("Ficheiro não encontrado.");
+
+        const caminhoFisico = path.join(__dirname, 'uploads', row.nome_servidor);
+        const agora = new Date();
+
+        // 2. ESCREVER NO LOG (O que o Admin vai ver)
+        const sqlLog = "INSERT INTO logs_atividade (usuario_nome, acao, ficheiro_nome, data_formatada, hora) VALUES (?, ?, ?, ?, ?)";
+        const paramsLog = [
+            user.nome, 
+            'DOWNLOAD', 
+            row.nome_original, 
+            agora.toLocaleDateString('pt-AO'), 
+            agora.toLocaleTimeString('pt-AO', { hour: '2-digit', minute: '2-digit' })
+        ];
+
+        db.run(sqlLog, paramsLog, (errLog) => {
+            if (errLog) console.error("Erro ao gravar log de download:", errLog.message);
+
+            // 3. Entregar o ficheiro ao utilizador com o nome original
+            res.download(caminhoFisico, row.nome_original);
+        });
     });
 });
 

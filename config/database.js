@@ -28,6 +28,17 @@ db.serialize(() => {
         usuario_id INTEGER,
         data_upload DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
+
+    // --- NOVA TABELA: Registo de Atividades (Logs) ---
+    // Esta tabela vai alimentar o quadro "Registo Recente" do Admin
+    db.run(`CREATE TABLE IF NOT EXISTS logs_atividade (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        usuario_nome TEXT NOT NULL,
+        acao TEXT NOT NULL, -- 'UPLOAD', 'DOWNLOAD' ou 'ELIMINAR'
+        ficheiro_nome TEXT NOT NULL,
+        data_formatada TEXT,
+        hora TEXT
+    )`);
 });
 
 module.exports = db;
