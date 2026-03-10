@@ -5,6 +5,10 @@ const db = require('./config/database');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
+const realizarBackup = require('./utils/backup');
+
+// Realiza o backup assim que o sistema inicia
+realizarBackup();
 
 // 1. IMPORTAR AS ROTAS DE AUTENTICAÇÃO (O ficheiro que criámos antes)
 const authRoutes = require('./routes/auth');
@@ -313,6 +317,7 @@ app.get('/admin/alterar-cargo/:id/:novoCargo', (req, res) => {
 });
 
 // Rota para eliminar ficheiro
+// Rota para eliminar ficheiro (ATUALIZADA COM LOG DE AUDITORIA)
 app.get('/eliminar/:id', (req, res) => {
     const user = req.session.user;
 
@@ -321,14 +326,18 @@ app.get('/eliminar/:id', (req, res) => {
         return res.send(renderError("Acesso Negado", "Apenas chefes podem eliminar ficheiros.", "error"));
     }
 
-    // 2. Procurar o ficheiro no banco para saber o nome real no servidor
-    db.get(`SELECT nome_servidor FROM ficheiros WHERE id = ?`, [req.params.id], (err, row) => {
+    const ficheiroId = req.params.id;
+
+    // 2. Procurar o ficheiro para saber o nome (para o Log e para o disco)
+    db.get(`SELECT nome_original, nome_servidor FROM ficheiros WHERE id = ?`, [ficheiroId], (err, row) => {
         if (err || !row) return res.redirect('/dashboard');
 
+        const nomeDoFicheiroParaLog = row.nome_original;
         const filePath = path.join(__dirname, 'uploads', row.nome_servidor);
+        const agora = new Date();
 
         // 3. Eliminar o registo da Base de Dados
-        db.run(`DELETE FROM ficheiros WHERE id = ?`, [req.params.id], (err) => {
+        db.run(`DELETE FROM ficheiros WHERE id = ?`, [ficheiroId], (err) => {
             if (err) return res.send(renderError("Erro", "Não foi possível eliminar o registo.", "error"));
 
             // 4. Eliminar o ficheiro físico da pasta 'uploads'
@@ -336,7 +345,19 @@ app.get('/eliminar/:id', (req, res) => {
                 fs.unlinkSync(filePath);
             }
 
-            res.redirect('/dashboard');
+            // --- PASSO 5: REGISTAR A ELIMINAÇÃO NO LOG (O QUE ESTAVA A FALTAR) ---
+            const dataLog = agora.toLocaleDateString('pt-AO');
+            const horaLog = agora.toLocaleTimeString('pt-AO', { hour: '2-digit', minute: '2-digit' });
+
+            const sqlLog = "INSERT INTO logs_atividade (usuario_nome, acao, ficheiro_nome, data_formatada, hora) VALUES (?, ?, ?, ?, ?)";
+            const paramsLog = [user.nome, 'ELIMINACAO', nomeDoFicheiroParaLog, dataLog, horaLog];
+
+            db.run(sqlLog, paramsLog, (errLog) => {
+                if (errLog) console.error("⚠️ Erro ao gravar Log de Eliminação:", errLog.message);
+                
+                // Redireciona para a Dashboard após tudo estar concluído
+                res.redirect('/dashboard');
+            });
         });
     });
 });
@@ -446,28 +467,24 @@ app.post('/perfil/atualizar', async (req, res) => {
 
 // ROTA: Listar utilizadores E registos de atividade para o Chefe
 app.get('/admin/utilizadores', (req, res) => {
-    // 1. Bloqueio de Segurança
-    if (!req.session.user || req.session.user.cargo !== 'admin') {
-        return res.send(renderError("Acesso Negado", "Esta área é restrita aos Chefes de Departamento.", "error"));
-    }
+    const userLogado = req.session.user; // Pega os dados de quem está logado
+    
+    if (!userLogado) return res.redirect('/login');
 
-    // 2. Primeira Consulta: Lista de Membros
-    const sqlUsers = "SELECT id, nome, departamento, cargo FROM usuarios ORDER BY nome ASC";
+    // FILTRO: Só seleciona utilizadores do MESMO departamento que o admin logado
+    const sqlUsers = "SELECT id, nome, departamento, cargo FROM usuarios WHERE departamento = ? ORDER BY nome ASC";
+    
+    db.all(sqlUsers, [userLogado.departamento], (err, users) => {
+        if (err) return res.send("Erro ao carregar lista.");
 
-    db.all(sqlUsers, [], (err, users) => {
-        if (err) return res.send(renderError("Erro", "Falha ao carregar utilizadores.", "error"));
+        // FILTRO NOS LOGS: Também só mostra logs de pessoas do mesmo departamento
+        const sqlLogs = `
+            SELECT logs_atividade.* FROM logs_atividade 
+            JOIN usuarios ON logs_atividade.usuario_nome = usuarios.nome 
+            WHERE usuarios.departamento = ? 
+            ORDER BY logs_atividade.id DESC LIMIT 15`;
 
-        // 3. Segunda Consulta: Últimos 15 registos de atividade
-        // Usamos ORDER BY id DESC para que os mais recentes apareçam no topo
-        const sqlLogs = "SELECT * FROM logs_atividade ORDER BY id DESC LIMIT 15";
-
-        db.all(sqlLogs, [], (errLogs, logs) => {
-            if (errLogs) {
-                console.error("Erro ao carregar logs:", errLogs.message);
-                // Se os logs falharem, ainda enviamos a página, mas com lista de logs vazia []
-            }
-
-            // 4. Enviar tudo para o renderizador
+        db.all(sqlLogs, [userLogado.departamento], (errLogs, logs) => {
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
             res.send(renderGestaoUtilizadores(users, logs || []));
         });
@@ -516,6 +533,7 @@ app.get('/download/:id', (req, res) => {
             res.download(caminhoFisico, row.nome_original);
         });
     });
+
 });
 
 app.listen(3000, () => console.log("Servidor INAMET rodando em http://localhost:3000"));

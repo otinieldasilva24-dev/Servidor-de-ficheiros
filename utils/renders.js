@@ -5,7 +5,7 @@ const headerPadrao = `
     <header class="fixed top-0 w-full z-50 glass border-b border-slate-200 h-20 bg-white/90 backdrop-blur-md"> 
         <div class="container mx-auto px-6 h-full flex justify-between items-center">
             <div class="flex items-center gap-3">
-                <img src="/img/logo-inamet.png" alt="Logo INAMET" class="h-16 w-auto object-contain py-1">
+                <a href="/"><img src="/img/logo-inamet.png" alt="Logo INAMET" class="h-16 w-auto object-contain py-1"></a>
                 <div class="border-l border-slate-300 pl-3 hidden sm:block">
                     <h1 class="font-black text-slate-800 leading-none tracking-tighter text-xl">INAMET</h1>
                     <p class="text-[10px] uppercase tracking-tighter text-slate-500 font-bold leading-tight">
@@ -14,14 +14,14 @@ const headerPadrao = `
                 </div>
             </div>
             <nav class="hidden md:flex gap-8 text-sm font-semibold text-slate-600">
-                <a href="/dashboard" class="hover:text-blue-700 transition">Início</a>
+                <a href="/" class="hover:text-blue-700 transition">Início</a>
+                
                 <a href="/departamentos" class="hover:text-blue-700 transition">Departamentos</a>
                 <a href="/suporte" class="hover:text-blue-700 transition">Suporte</a>
             </nav>
         </div>
     </header>
 `;
-
 // Função Auxiliar para Ícones Dinâmicos
 function getFileInfo(filename) {
     const ext = filename.split('.').pop().toLowerCase();
@@ -115,20 +115,36 @@ const renderGestaoUtilizadores = (users, logs = []) => {
         </tr>
     `).join('');
 
-    // Renderização dos Logs de Auditoria
-    const logRows = logs.length > 0 ? logs.map(l => `
-        <div class="log-item flex items-start gap-4 p-4 border-b border-slate-50 hover:bg-slate-50/50 transition-all" data-tipo="${l.acao}">
-            <div class="w-2 h-2 rounded-full mt-1.5 ${l.acao === 'DOWNLOAD' ? 'bg-amber-400' : 'bg-green-400'}"></div>
-            <div class="flex-1">
-                <p class="text-xs text-slate-700 leading-relaxed">
-                    <span class="font-black text-slate-900">${l.usuario_nome}</span> 
-                    fez <span class="font-bold ${l.acao === 'DOWNLOAD' ? 'text-amber-600' : 'text-green-600'}">${l.acao}</span> do ficheiro 
-                    <span class="italic text-slate-500">"${l.ficheiro_nome}"</span>
-                </p>
-                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">${l.data_formatada} • ${l.hora}</span>
+    // Renderização dos Logs com lógica de cores para Eliminação
+    const logRows = logs.length > 0 ? logs.map(l => {
+        let corBola = 'bg-green-400'; 
+        let corTexto = 'text-green-600';
+        let labelAcao = 'fez UPLOAD do';
+
+        if (l.acao === 'DOWNLOAD') {
+            corBola = 'bg-amber-400';
+            corTexto = 'text-amber-600';
+            labelAcao = 'fez DOWNLOAD do';
+        } else if (l.acao === 'ELIMINACAO' || l.acao === 'DELETE') {
+            corBola = 'bg-red-500';
+            corTexto = 'text-red-600';
+            labelAcao = 'ELIMINOU o';
+        }
+
+        return `
+            <div class="log-item flex items-start gap-4 p-4 border-b border-slate-50 hover:bg-slate-50/50 transition-all" data-tipo="${l.acao}">
+                <div class="w-2 h-2 rounded-full mt-1.5 ${corBola}"></div>
+                <div class="flex-1">
+                    <p class="text-xs text-slate-700 leading-relaxed">
+                        <span class="font-black text-slate-900">${l.usuario_nome}</span> 
+                        <span class="font-bold ${corTexto}">${labelAcao}</span> ficheiro 
+                        <span class="italic text-slate-500">"${l.ficheiro_nome}"</span>
+                    </p>
+                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">${l.data_formatada} • ${l.hora}</span>
+                </div>
             </div>
-        </div>
-    `).join('') : '<div class="p-10 text-center text-slate-400 italic text-xs font-medium">Sem atividades registadas recentemente.</div>';
+        `;
+    }).join('') : '<div class="p-10 text-center text-slate-400 italic text-xs font-medium">Sem atividades recentes.</div>';
 
     return `<!DOCTYPE html>
     <html lang="pt">
@@ -140,40 +156,34 @@ const renderGestaoUtilizadores = (users, logs = []) => {
         <style>
             @keyframes fade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
             .animate-fade { animation: fade 0.4s ease-out forwards; }
-            
-            /* Scrollbar Interna Personalizada */
             .custom-scroll::-webkit-scrollbar { width: 4px; }
             .custom-scroll::-webkit-scrollbar-track { background: transparent; }
             .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
-            .custom-scroll::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
-
-            /* Estilo dos Botões de Filtro */
-            .filter-btn { background: #f8fafc; color: #94a3b8; border: 1px solid #f1f5f9; cursor: pointer; transition: all 0.3s; }
+            .filter-btn { background: #f8fafc; color: #94a3b8; border: 1px solid #f1f5f9; cursor: pointer; transition: all 0.2s; }
             .filter-btn.active { background: #1d4ed8; color: white; border-color: #1d4ed8; box-shadow: 0 4px 12px rgba(29, 78, 216, 0.2); }
         </style>
     </head>
-    <body class="bg-slate-50 min-h-screen overflow-x-hidden text-slate-900">
+    <body class="bg-slate-50 min-h-screen overflow-x-hidden">
         ${headerPadrao}
         
         <main class="container mx-auto px-6 pt-32 pb-10 animate-fade">
             <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8">
                 <div>
                     <h2 class="text-3xl font-black text-slate-800 tracking-tighter uppercase leading-none">Gestão e <span class="text-blue-600">Auditoria</span></h2>
-                    <p class="text-slate-500 font-medium italic mt-2 text-sm">Monitorização de atividades do departamento.</p>
+                    <p class="text-slate-500 font-medium italic mt-2 text-sm">Controlo de acesso e histórico de ficheiros.</p>
                 </div>
                 <div class="flex gap-3">
                     <div class="bg-white border border-slate-200 px-5 py-3 rounded-2xl shadow-sm text-center">
-                        <span class="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Equipa</span>
+                        <span class="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Equipa</span>
                         <span class="text-xl font-black text-slate-800">${users.length}</span>
                     </div>
                     <a href="/dashboard" class="h-14 flex items-center bg-blue-600 text-white px-8 rounded-2xl text-[10px] font-black uppercase shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all">
-                        Voltar ao Painel
+                        Voltar
                     </a>
                 </div>
             </div>
 
             <div class="grid lg:grid-cols-3 gap-8 items-start">
-                
                 <div class="lg:col-span-2 bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
                     <div class="p-6 border-b border-slate-50 bg-slate-50/30">
                         <h3 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Membros do Departamento</h3>
@@ -187,20 +197,16 @@ const renderGestaoUtilizadores = (users, logs = []) => {
 
                 <div class="lg:col-span-1">
                     <div class="bg-white rounded-[2.5rem] shadow-md border border-slate-100 overflow-hidden flex flex-col h-[480px] sticky top-32">
-                        
                         <div class="p-6 border-b border-slate-50 bg-slate-50/30 space-y-4">
                             <div class="flex justify-between items-center">
                                 <h3 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Registo Recente</h3>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-[8px] font-bold text-green-500 uppercase tracking-widest"></span>
-                                    <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                                </div>
+                                <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                             </div>
-                            
-                            <div class="flex gap-1.5">
+                            <div class="flex gap-1.5 overflow-x-auto">
                                 <button onclick="filtrarLogs('TODOS')" id="btn-todos" class="filter-btn active flex-1 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest">Todos</button>
                                 <button onclick="filtrarLogs('UPLOAD')" id="btn-upload" class="filter-btn flex-1 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest">Uploads</button>
                                 <button onclick="filtrarLogs('DOWNLOAD')" id="btn-download" class="filter-btn flex-1 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest">Downloads</button>
+                                <button onclick="filtrarLogs('ELIMINACAO')" id="btn-eliminacao" class="filter-btn flex-1 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest">Apagados</button>
                             </div>
                         </div>
 
@@ -209,7 +215,6 @@ const renderGestaoUtilizadores = (users, logs = []) => {
                         </div>
                     </div>
                 </div>
-
             </div>
         </main>
 
@@ -217,14 +222,12 @@ const renderGestaoUtilizadores = (users, logs = []) => {
             function filtrarLogs(tipo) {
                 const logs = document.querySelectorAll('.log-item');
                 const botoes = document.querySelectorAll('.filter-btn');
-
-                // Atualiza visual dos botões
                 botoes.forEach(btn => btn.classList.remove('active'));
                 document.getElementById('btn-' + tipo.toLowerCase()).classList.add('active');
 
-                // Filtra os itens na lista
                 logs.forEach(log => {
-                    if (tipo === 'TODOS' || log.getAttribute('data-tipo') === tipo) {
+                    const logTipo = log.getAttribute('data-tipo');
+                    if (tipo === 'TODOS' || logTipo === tipo || (tipo === 'ELIMINACAO' && logTipo === 'DELETE')) {
                         log.style.display = 'flex';
                     } else {
                         log.style.display = 'none';
