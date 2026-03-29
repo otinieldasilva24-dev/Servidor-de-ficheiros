@@ -287,7 +287,6 @@ const renderDashboard = (user, files = []) => {
         </tr>`;
     }).join('') : `<tr><td colspan="3" class="px-10 py-32 text-center text-slate-400 italic font-medium">Nenhum documento encontrado.</td></tr>`;
 
-    // O restante do retorno HTML permanece igual ao seu código original...
     return `<!DOCTYPE html>
     <html lang="pt">
     <head>
@@ -429,6 +428,7 @@ const renderPerfil = (user, estatisticas) => {
                             </div>
                         </div>
                     </div>
+                    
                     <div class="md:col-span-2">
                         <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-200">
                             <h3 class="text-lg font-black text-slate-800 mb-6 border-b border-slate-50 pb-4 uppercase tracking-tight">Definições da Conta</h3>
@@ -453,11 +453,95 @@ const renderPerfil = (user, estatisticas) => {
                                     </a>
                                 </div>
                             </form>
+
+                            <div class="mt-12 pt-6 border-t border-slate-100">
+                                <h3 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Zona de Perigo</h3>
+                                <button onclick="confirmarExclusao()" 
+                                        class="flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-3 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-600 hover:text-white transition-all duration-300">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    Eliminar Minha Conta
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </main>
+
+        <script>
+        function confirmarExclusao() {
+            const certeza = confirm("Tem a certeza que deseja eliminar a sua conta? Esta ação é irreversível e todos os seus ficheiros serão perdidos.");
+            if (certeza) {
+                window.location.href = "/eliminar-conta";
+            }
+        }
+        </script>
+
+                        <div id="modalExclusao" 
+     class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4 transition-opacity duration-300 opacity-0">
+    
+    <div class="bg-white max-w-md w-full rounded-[3rem] shadow-2xl p-12 text-center transform scale-95 transition-transform duration-300 ease-out border border-slate-100">
+        
+        <div class="w-24 h-24 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-8 shadow-lg shadow-red-100">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+        </div>
+
+        <h3 class="text-3xl font-black text-slate-800 mb-4 uppercase tracking-tighter italic">Eliminar <span class="text-red-600">Conta?</span></h3>
+        <p class="text-slate-500 mb-10 leading-relaxed text-sm p-2 bg-slate-50 rounded-2xl border border-slate-100">
+            Esta ação é <strong class="text-slate-800">irreversível</strong>. Todos os teus ficheiros e dados do <strong class="text-blue-700">INAMET</strong> serão apagados permanentemente do sistema.
+        </p>
+
+        <div class="flex flex-col sm:flex-row gap-4">
+            <button onclick="fecharModalExclusao()" 
+                    class="flex-1 px-8 py-5 bg-slate-100 text-slate-600 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95">
+                Não, Cancelar
+            </button>
+            
+            <a href="/eliminar-conta" 
+               class="flex-1 px-8 py-5 bg-red-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-lg shadow-red-100 hover:bg-red-700 transition-all active:scale-95 flex items-center justify-center">
+                Sim, Eliminar
+            </a>
+        </div>
+    </div>
+</div>
+            <script>
+                // Função para abrir o modal com animação suave
+                function confirmarExclusao() {
+                    const modal = document.getElementById('modalExclusao');
+                    const contentor = modal.firstElementChild;
+
+                    // Mostra o fundo (fade-in)
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
+                    setTimeout(() => { modal.classList.remove('opacity-0'); }, 10);
+
+                    // Anima o conteúdo (scale-up)
+                    setTimeout(() => { contentor.classList.remove('scale-95'); contentor.classList.add('scale-100'); }, 10);
+                }
+
+                // Função para fechar o modal com animação suave
+                function fecharModalExclusao() {
+                    const modal = document.getElementById('modalExclusao');
+                    const contentor = modal.firstElementChild;
+
+                    // Esconde o conteúdo (scale-down)
+                    contentor.classList.add('scale-95');
+                    contentor.classList.remove('scale-100');
+
+                    // Esconde o fundo (fade-out)
+                    modal.classList.add('opacity-0');
+                    
+                    // Remove do DOM após a animação acabar (300ms)
+                    setTimeout(() => {
+                        modal.classList.add('hidden');
+                        modal.classList.remove('flex');
+                    }, 300);
+                }
+            </script>
     </body>
     </html>`;
 };

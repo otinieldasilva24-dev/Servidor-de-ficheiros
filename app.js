@@ -1,3 +1,4 @@
+const bcrypt = require('bcrypt');
 const { renderDashboard, renderPerfil, renderError, renderGestaoUtilizadores, headerPadrao } = require('./utils/renders');
 const express = require('express');
 const session = require('express-session');
@@ -130,7 +131,7 @@ app.get('/departamentos', (req, res) => {
             <div class="container mx-auto px-6">
                 <h2 class="text-3xl font-black text-slate-800 mb-8 border-l-4 border-blue-700 pl-4 uppercase">Estrutura Departamental</h2>
                 <div class="grid md:grid-cols-3 gap-6">
-                    ${['Logística', 'Financeiro', 'Recursos Humanos', 'Vendas', 'TI'].map(dept => `
+                    ${['DT1', 'DT2', 'DT3', 'DT4', 'DT5'].map(dept => `
                         <div class="bg-white p-6 rounded-2xl shadow-md border border-slate-100 hover:border-blue-300 transition-all group cursor-pointer">
                             <div class="w-12 h-12 bg-blue-50 text-blue-700 rounded-lg flex items-center justify-center mb-4 font-bold group-hover:bg-blue-700 group-hover:text-white transition">D</div>
                             <h3 class="font-bold text-xl text-slate-800">${dept}</h3>
@@ -151,20 +152,41 @@ app.get('/suporte', (req, res) => {
         <html lang="pt">
         <head>
             <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <script src="https://cdn.tailwindcss.com"></script>
             <title>INAMET | Suporte</title>
         </head>
-        <body class="bg-slate-50 pt-32 font-sans">
+        <body class="bg-slate-50 min-h-screen flex flex-col font-sans">
+            
             ${headerPadrao}
-            <div class="container mx-auto px-6 flex justify-center">
-                <div class="max-w-2xl bg-white p-12 rounded-[3rem] shadow-xl text-center">
-                    <h2 class="text-4xl font-black text-slate-800 mb-6 uppercase">Suporte <span class="text-blue-700">Técnico</span></h2>
-                    <p class="text-slate-500 mb-8 leading-relaxed">Problemas com o acesso? Entre em contacto com o departamento de TI através do e-mail institucional.</p>
-                    <div class="p-6 bg-blue-50 rounded-2xl border border-blue-100 font-bold text-blue-700">
-                        suporte.ti@inamet.gov.ao
+
+            <main class="flex-grow flex items-start justify-center px-6 mt-40">
+                <div class="max-w-2xl w-full bg-white p-12 rounded-[3rem] shadow-xl text-center border border-slate-100 transform hover:scale-[1.01] transition-transform duration-300">
+                    <div class="inline-flex items-center justify-center w-20 h-20 bg-blue-100 text-blue-700 rounded-full mb-6">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
                     </div>
+
+                    <h2 class="text-4xl font-black text-slate-800 mb-6 uppercase tracking-tight">
+                        Suporte <span class="text-blue-700">Técnico</span>
+                    </h2>
+                    
+                    <p class="text-slate-500 mb-10 leading-relaxed text-lg">
+                        Problemas com o acesso ou erros no sistema? <br>
+                        Clique abaixo para abrir o Gmail e falar com a equipa de TI.
+                    </p>
+                    
+                    <a href="https://mail.google.com/mail/?view=cm&fs=1&to=suporte.ti@inamet.gov.ao&su=Suporte Técnico - INAMET" 
+                       target="_blank"
+                       class="group relative inline-flex items-center justify-center w-full sm:w-auto px-8 py-6 bg-blue-700 rounded-2xl font-bold text-white shadow-lg hover:bg-blue-800 transition-all duration-300 overflow-hidden">
+                        <span class="relative z-10">suporte.ti@inamet.gov.ao</span>
+                        <div class="absolute inset-0 bg-white/10 group-hover:bg-transparent transition-colors"></div>
+                    </a>
                 </div>
-            </div>
+            </main>
+
+            <div class="h-32"></div>
         </body>
         </html>
     `);
@@ -316,7 +338,6 @@ app.get('/admin/alterar-cargo/:id/:novoCargo', (req, res) => {
     });
 });
 
-// Rota para eliminar ficheiro
 // Rota para eliminar ficheiro (ATUALIZADA COM LOG DE AUDITORIA)
 app.get('/eliminar/:id', (req, res) => {
     const user = req.session.user;
@@ -382,7 +403,27 @@ app.get('/perfil', (req, res) => {
     });
 });
 
-const bcrypt = require('bcrypt'); // Garante que isto está no topo do app.js
+app.get('/eliminar-conta', (req, res) => {
+    const user = req.session.user;
+    if (!user) return res.redirect('/login');
+
+    const userId = user.id;
+
+    db.run("DELETE FROM usuarios WHERE id = ?", [userId], function(err) {
+        if (err) {
+            console.error(err.message);
+            return res.redirect('/perfil?error=delete_failed');
+        }
+
+        // Destruímos a sessão e mandamos para o login com o status 'deleted'
+        req.session.destroy((err) => {
+            if (err) return res.redirect('/');
+            
+            // REDIRECIONAMENTO SILENCIOSO
+            res.redirect('/login?status=deleted');
+        });
+    });
+});
 
 app.post('/perfil/atualizar', async (req, res) => {
     if (!req.session.user) return res.redirect('/login');
@@ -536,4 +577,4 @@ app.get('/download/:id', (req, res) => {
 
 });
 
-app.listen(3000, () => console.log("Servidor INAMET rodando em http://localhost:3000"));
+app.listen(3001, () => console.log("Servidor INAMET rodando em http://localhost:3001"));

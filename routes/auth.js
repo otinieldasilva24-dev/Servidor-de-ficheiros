@@ -5,7 +5,7 @@ const db = require('../config/database');
 const { headerPadrao, renderError } = require('../utils/renders');
 
 // --- LOGIN (GET) ---
-router.get('/login', (req, res) => { 
+router.get('/login', (req, res) => {
     res.send(`
         <!DOCTYPE html>
         <html lang="pt">
@@ -73,7 +73,7 @@ router.post('/login', async (req, res) => {
 });
 
 // --- REGISTO (GET) ---
-router.get('/registo', (req, res) => { 
+router.get('/registo', (req, res) => {
     res.send(`
         <!DOCTYPE html>
         <html lang="pt">
@@ -117,10 +117,11 @@ router.get('/registo', (req, res) => {
                             <label class="block text-[9px] font-extrabold text-slate-400 uppercase tracking-[0.2em] mb-1 ml-1">Departamento</label>
                             <select name="departamento" required class="input-field w-full px-5 py-3 rounded-2xl bg-slate-50 text-sm text-slate-500">
                                 <option value="" disabled selected>Selecionar Área</option>
-                                <option value="logistica">Logística</option>
-                                <option value="financeiro">Financeiro</option>
-                                <option value="rh">Recursos Humanos</option>
-                                <option value="ti">Tecnologia (TI)</option>
+                                <option value="dt1">DT1</option>
+                                <option value="dt2">DT2</option>
+                                <option value="dt3">DT3</option>
+                                <option value="dt4">DT4</option>
+                                <option value="dt5">DT5</option>
                             </select>
                         </div>
                         <button type="submit" class="btn-primary w-full text-white py-3.5 rounded-2xl font-bold uppercase tracking-[0.15em] text-xs shadow-lg mt-2">Finalizar Cadastro</button>
@@ -137,14 +138,14 @@ router.get('/registo', (req, res) => {
 });
 
 // --- REGISTO (POST) ---
-router.post('/registo', async (req, res) => { 
-     const { nome, email, senha, departamento } = req.body;
-     try {
+router.post('/registo', async (req, res) => {
+    const { nome, email, senha, departamento } = req.body;
+    try {
         const hash = await bcrypt.hash(senha, 10);
-        db.run(`INSERT INTO usuarios (nome, email, senha, departamento) VALUES (?, ?, ?, ?)`, 
-        [nome, email, hash, departamento], (err) => {
-            if (err) {
-                return res.send(`
+        db.run(`INSERT INTO usuarios (nome, email, senha, departamento) VALUES (?, ?, ?, ?)`,
+            [nome, email, hash, departamento], (err) => {
+                if (err) {
+                    return res.send(`
                     <html>
                     <head><script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script></head>
                     <body><script>
@@ -152,8 +153,8 @@ router.post('/registo', async (req, res) => {
                         .then(() => { window.location.href = '/login'; });
                     </script></body></html>
                 `);
-            }
-            return res.send(`
+                }
+                return res.send(`
                 <html>
                 <head><script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script></head>
                 <body><script>
@@ -161,14 +162,14 @@ router.post('/registo', async (req, res) => {
                     .then(() => { window.location.href = '/login'; });
                 </script></body></html>
             `);
-        });
+            });
     } catch (e) {
         res.send(renderError('Erro', 'Falha no servidor', 'error'));
     }
 });
 
 // --- RECUPERAR SENHA (GET) ---
-router.get('/recuperar-senha', (req, res) => { 
+router.get('/recuperar-senha', (req, res) => {
     res.send(`
         <!DOCTYPE html>
         <html lang="pt">
@@ -205,7 +206,7 @@ router.get('/recuperar-senha', (req, res) => {
 });
 
 // --- RECUPERAR SENHA (POST) ---
-router.post('/recuperar-senha', (req, res) => { 
+router.post('/recuperar-senha', (req, res) => {
     const { email } = req.body;
     db.get(`SELECT id FROM usuarios WHERE email = ?`, [email], (err, user) => {
         if (err || !user) {
@@ -216,7 +217,7 @@ router.post('/recuperar-senha', (req, res) => {
 });
 
 // --- NOVA SENHA (GET) ---
-router.get('/nova-senha', (req, res) => { 
+router.get('/nova-senha', (req, res) => {
     const userId = req.query.id;
     if (!userId) return res.redirect('/login');
     res.send(`
@@ -244,7 +245,7 @@ router.get('/nova-senha', (req, res) => {
 });
 
 // --- ATUALIZAR SENHA (POST) ---
-router.post('/atualizar-senha', async (req, res) => { 
+router.post('/atualizar-senha', async (req, res) => {
     const { userId, novaSenha } = req.body;
     if (!novaSenha || novaSenha.length < 6) {
         return res.send(renderError('Segurança', 'A senha deve ter pelo menos 6 caracteres.', 'warning'));
