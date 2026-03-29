@@ -15,22 +15,21 @@ const headerPadrao = `
             </div>
             <nav class="hidden md:flex gap-8 text-sm font-semibold text-slate-600">
                 <a href="/" class="hover:text-blue-700 transition">Início</a>
-                
                 <a href="/departamentos" class="hover:text-blue-700 transition">Departamentos</a>
                 <a href="/suporte" class="hover:text-blue-700 transition">Suporte</a>
             </nav>
         </div>
     </header>
 `;
+
 // Função Auxiliar para Ícones Dinâmicos
 function getFileInfo(filename) {
-    const ext = filename.split('.').pop().toLowerCase();
+    const ext = (filename || '').split('.').pop().toLowerCase();
     const map = {
-        'pdf': { icon: '📄', bg: 'bg-red-50', text: 'text-red-500' },
-        'docx': { icon: '📝', bg: 'bg-blue-50', text: 'text-blue-500' },
-        'doc': { icon: '📝', bg: 'bg-blue-50', text: 'text-blue-500' },
-        'xlsx': { icon: '📊', bg: 'bg-green-50', text: 'text-green-500' },
-        'xls': { icon: '📊', bg: 'bg-green-50', text: 'text-green-500' },
+        'pdf': { icon: '📕', bg: 'bg-red-50', text: 'text-red-500' },
+        'docx': { icon: '📘', bg: 'bg-blue-50', text: 'text-blue-500' },
+        'xlsm': { icon: '📗', bg: 'bg-green-50', text: 'text-green-500' },
+        'pptx': { icon: '📙', bg: 'bg-amber-50', text: 'text-amber-500' },
         'png': { icon: '🖼️', bg: 'bg-purple-50', text: 'text-purple-500' },
         'jpg': { icon: '🖼️', bg: 'bg-purple-50', text: 'text-purple-500' },
         'jpeg': { icon: '🖼️', bg: 'bg-purple-50', text: 'text-purple-500' },
@@ -41,20 +40,20 @@ function getFileInfo(filename) {
 }
 
 // ==========================================
-// 2. MODAIS (UPLOAD E MODO CHEFE)
+// MODAIS REUTILIZÁVEIS (UPLOAD + CHEFE)
 // ==========================================
-const renderModais = (user) => {
+function renderModais(user) {
     return `
         <div id="modalUpload" class="fixed inset-0 modal-bg z-[100] hidden flex items-center justify-center p-6">
             <div class="bg-white w-full max-w-md rounded-[2.5rem] p-10 animate-fade text-center">
                 <h3 class="text-2xl font-800 text-slate-800 mb-6 uppercase tracking-tight">Enviar <span class="text-blue-600">Documento</span></h3>
-                <form action="/upload" method="POST" enctype="multipart/form-data" class="space-y-5">
+                <form action="/upload" method="POST" enctype="multipart/form-data" class="space-y-5" onsubmit="return validarUpload(this)">
                     <input type="hidden" name="departamento" value="${user.departamento}">
                     <div class="p-8 border-2 border-dashed border-slate-200 rounded-3xl hover:border-blue-400 transition-all bg-slate-50/50">
                         <label class="cursor-pointer block">
                             <span class="block text-4xl mb-3">📁</span>
                             <span id="fileNameDisplay" class="text-sm font-semibold text-blue-600 italic">Escolher do PC</span>
-                            <input type="file" name="ficheiro" required class="hidden" onchange="document.getElementById('fileNameDisplay').innerText = this.files[0].name">
+                            <input type="file" name="ficheiro" required class="hidden" onchange="handleFileSelect(this)">
                         </label>
                     </div>
                     <div class="flex gap-3 pt-4">
@@ -79,8 +78,42 @@ const renderModais = (user) => {
                 </form>
             </div>
         </div>
+
+        <script>
+            function handleFileSelect(input) {
+                if (input.files && input.files[0]) {
+                    document.getElementById('fileNameDisplay').innerText = input.files[0].name;
+                }
+            }
+
+            function validarUpload(form) {
+                const allowed = ['pdf','docx','pptx','xlsm'];
+                const input = form.querySelector('input[type=file]');
+                if (!input || !input.files || input.files.length === 0) {
+                    if (window.Swal) {
+                        Swal.fire({ icon: 'warning', title: 'Ficheiro necessário', text: 'Por favor escolha um ficheiro para enviar.', confirmButtonColor: '#1d4ed8' });
+                    } else alert('Por favor escolha um ficheiro para enviar.');
+                    return false;
+                }
+                const name = input.files[0].name;
+                const ext = name.split('.').pop().toLowerCase();
+                if (!allowed.includes(ext)) {
+                    const msg = 'Apenas são permitidos ficheiros: pdf, docx, pptx e xlsm.';
+                    if (window.Swal) {
+                        Swal.fire({ icon: 'warning', title: 'Tipo de Ficheiro Inválido', text: msg, confirmButtonColor: '#1d4ed8' });
+                    } else alert(msg);
+                    return false;
+                }
+                return true;
+            }
+
+            function abrirModal() { document.getElementById('modalUpload').classList.remove('hidden'); }
+            function fecharModal() { document.getElementById('modalUpload').classList.add('hidden'); }
+            function abrirModalChefe() { document.getElementById('modalChefe').classList.remove('hidden'); }
+            function fecharModalChefe() { document.getElementById('modalChefe').classList.add('hidden'); }
+        </script>
     `;
-};
+}
 
 // ==========================================
 // 3. PÁGINA: GESTÃO DE UTILIZADORES
@@ -117,7 +150,7 @@ const renderGestaoUtilizadores = (users, logs = []) => {
 
     // Renderização dos Logs com lógica de cores para Eliminação
     const logRows = logs.length > 0 ? logs.map(l => {
-        let corBola = 'bg-green-400'; 
+        let corBola = 'bg-green-400';
         let corTexto = 'text-green-600';
         let labelAcao = 'fez UPLOAD do';
 
@@ -385,7 +418,7 @@ const renderDashboard = (user, files = []) => {
         }
     }).then((result) => {
         if (result.isConfirmed) {
-            window.location.replace("/login");
+            window.location.href = "/logout";
         }
     });
 }
@@ -470,42 +503,39 @@ const renderPerfil = (user, estatisticas) => {
             </div>
         </main>
 
-        <script>
-        function confirmarExclusao() {
-            const certeza = confirm("Tem a certeza que deseja eliminar a sua conta? Esta ação é irreversível e todos os seus ficheiros serão perdidos.");
-            if (certeza) {
-                window.location.href = "/eliminar-conta";
-            }
-        }
-        </script>
+        
 
                         <div id="modalExclusao" 
      class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4 transition-opacity duration-300 opacity-0">
     
-    <div class="bg-white max-w-md w-full rounded-[3rem] shadow-2xl p-12 text-center transform scale-95 transition-transform duration-300 ease-out border border-slate-100">
-        
-        <div class="w-24 h-24 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-8 shadow-lg shadow-red-100">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <div class="bg-white max-w-md w-full rounded-[3rem] shadow-2xl p-8 text-center transform scale-95 transition-transform duration-300 ease-out border border-slate-100">
+        <div class="w-20 h-20 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-md">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
         </div>
 
-        <h3 class="text-3xl font-black text-slate-800 mb-4 uppercase tracking-tighter italic">Eliminar <span class="text-red-600">Conta?</span></h3>
-        <p class="text-slate-500 mb-10 leading-relaxed text-sm p-2 bg-slate-50 rounded-2xl border border-slate-100">
+        <h3 class="text-2xl font-black text-slate-800 mb-2 uppercase tracking-tight">Eliminar <span class="text-red-600">Conta?</span></h3>
+        <p class="text-slate-500 mb-6 leading-relaxed text-sm p-2 bg-slate-50 rounded-2xl border border-slate-100">
             Esta ação é <strong class="text-slate-800">irreversível</strong>. Todos os teus ficheiros e dados do <strong class="text-blue-700">INAMET</strong> serão apagados permanentemente do sistema.
         </p>
 
-        <div class="flex flex-col sm:flex-row gap-4">
-            <button onclick="fecharModalExclusao()" 
-                    class="flex-1 px-8 py-5 bg-slate-100 text-slate-600 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95">
-                Não, Cancelar
-            </button>
-            
-            <a href="/eliminar-conta" 
-               class="flex-1 px-8 py-5 bg-red-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-lg shadow-red-100 hover:bg-red-700 transition-all active:scale-95 flex items-center justify-center">
-                Sim, Eliminar
-            </a>
-        </div>
+        <form action="/eliminar-conta" method="POST" class="mt-4 w-full">
+            <input name="senha_confirmacao" required type="password" placeholder="Insira a sua senha para confirmar" 
+                   class="w-full px-4 py-3 border border-slate-100 rounded-2xl outline-none focus:border-red-600 placeholder-slate-400 mb-4">
+
+            <div class="flex flex-col sm:flex-row gap-3">
+                <button type="button" onclick="fecharModalExclusao()" 
+                        class="w-full sm:w-auto px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95">
+                    Não, Cancelar
+                </button>
+
+                <button type="submit" 
+                   class="w-full sm:w-auto px-6 py-3 bg-red-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-md hover:bg-red-700 transition-all active:scale-95">
+                    Sim, Eliminar
+                </button>
+            </div>
+        </form>
     </div>
 </div>
             <script>
@@ -571,11 +601,118 @@ function renderError(titulo, mensagem, icone) {
 // ==========================================
 // 6. EXPORTAÇÃO
 // ==========================================
-module.exports = { 
-    headerPadrao, 
+module.exports = {
+    headerPadrao,
     renderModais,
-    renderDashboard, 
-    renderPerfil, 
+    renderDashboard,
+    renderPerfil,
     renderError,
-    renderGestaoUtilizadores 
+    renderGestaoUtilizadores,
+    renderSuperAdminDashboard
 };
+
+// ==========================================
+// PÁGINA: SUPER-ADMIN (ACESSO GLOBAL)
+// ==========================================
+function renderSuperAdminDashboard(users = [], files = [], logs = []) {
+    const totalUsers = users.length;
+    const totalFiles = files.length;
+    const totalLogs = logs.length;
+
+    const userRows = users.map(u => `
+        <tr class="hover:bg-slate-50/50">
+            <td class="px-6 py-4">${u.id}</td>
+            <td class="px-6 py-4 font-bold text-slate-800">${u.nome}</td>
+            <td class="px-6 py-4 text-slate-500">${u.departamento}</td>
+            <td class="px-6 py-4 text-[10px] font-black">${u.cargo}</td>
+        </tr>
+    `).join('') || `<tr><td colspan="4" class="p-8 text-center text-slate-400 italic">Sem utilizadores.</td></tr>`;
+
+    const fileRows = files.map(f => `
+        <tr class="hover:bg-slate-50/50">
+            <td class="px-6 py-4">${f.id}</td>
+            <td class="px-6 py-4 font-bold">${f.nome_original}</td>
+            <td class="px-6 py-4 text-slate-500">${f.departamento || '—'}</td>
+            <td class="px-6 py-4 text-[10px]">${new Date(f.data_upload).toLocaleString('pt-AO')}</td>
+        </tr>
+    `).join('') || `<tr><td colspan="4" class="p-8 text-center text-slate-400 italic">Sem ficheiros.</td></tr>`;
+
+    const logRows = logs.map(l => `
+        <div class="p-3 border-b border-slate-50">
+            <div class="text-sm"><span class="font-black">${l.usuario_nome}</span> · <span class="text-slate-500">${l.acao}</span></div>
+            <div class="text-xs text-slate-400">${l.data_formatada} • ${l.hora} — ${l.ficheiro_nome}</div>
+        </div>
+    `).join('') || `<div class="p-6 text-center text-slate-400 italic">Sem registos.</div>`;
+
+    return `<!DOCTYPE html>
+    <html lang="pt">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Admin Geral - INAMET</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-slate-50 min-h-screen font-sans">
+        ${headerPadrao}
+        <main class="container mx-auto px-6 pt-32 pb-20">
+            <div class="flex items-center justify-between mb-8">
+                <div>
+                    <h1 class="text-3xl font-black text-slate-800 uppercase">Admin Geral</h1>
+                    <p class="text-slate-500 text-sm mt-2">Painel de controlo completo do sistema.</p>
+                </div>
+                <div class="flex gap-3 items-center">
+                    <div class="text-center bg-white border border-slate-100 px-6 py-3 rounded-2xl">
+                        <div class="text-[10px] text-slate-400 uppercase font-black">Utilizadores</div>
+                        <div class="text-xl font-black text-slate-800">${totalUsers}</div>
+                    </div>
+                    <div class="text-center bg-white border border-slate-100 px-6 py-3 rounded-2xl">
+                        <div class="text-[10px] text-slate-400 uppercase font-black">Ficheiros</div>
+                        <div class="text-xl font-black text-slate-800">${totalFiles}</div>
+                    </div>
+                    <a href="/superadmin/logout" class="bg-amber-50 border border-amber-200 px-4 py-3 rounded-2xl font-black text-amber-700">Sair ADM</a>
+                </div>
+            </div>
+
+            <div class="grid lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                    <div class="p-6 border-b border-slate-50">
+                        <h2 class="font-black text-slate-800">Ficheiros</h2>
+                        <p class="text-xs text-slate-400">Últimos ficheiros enviados.</p>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-slate-50 text-slate-500 text-[10px] uppercase font-black">
+                                <tr><th class="px-6 py-3">ID</th><th class="px-6 py-3">Nome</th><th class="px-6 py-3">Departamento</th><th class="px-6 py-3">Upload</th></tr>
+                            </thead>
+                            <tbody>${fileRows}</tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                    <div class="p-6 border-b border-slate-50">
+                        <h2 class="font-black text-slate-800">Utilizadores</h2>
+                        <p class="text-xs text-slate-400">Lista completa de utilizadores.</p>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-slate-50 text-slate-500 text-[10px] uppercase font-black">
+                                <tr><th class="px-6 py-3">ID</th><th class="px-6 py-3">Nome</th><th class="px-6 py-3">Departamento</th><th class="px-6 py-3">Cargo</th></tr>
+                            </thead>
+                            <tbody>${userRows}</tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8 bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                <div class="p-6 border-b border-slate-50">
+                    <h2 class="font-black text-slate-800">Registo de Atividades</h2>
+                    <p class="text-xs text-slate-400">Últimos eventos do sistema.</p>
+                </div>
+                <div class="p-2 overflow-y-auto max-h-72">${logRows}</div>
+            </div>
+        </main>
+    </body>
+    </html>`;
+}

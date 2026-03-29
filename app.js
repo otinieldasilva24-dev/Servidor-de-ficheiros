@@ -18,7 +18,7 @@ const app = express();
 
 // --- GARANTIR QUE A PASTA UPLOADS EXISTE ---
 const uploadDir = './uploads';
-if (!fs.existsSync(uploadDir)){
+if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir);
 }
 
@@ -26,6 +26,7 @@ if (!fs.existsSync(uploadDir)){
 app.use(express.static('public'));
 app.use('/uploads', express.static('uploads')); // Para conseguires abrir os ficheiros depois
 app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 app.use(session({
     secret: 'segredo-inamet-2026',
     resave: false,
@@ -36,7 +37,7 @@ app.use(session({
 // --- CONFIGURAÇÃO DO MULTER (GESTÃO DE FICHEIROS) ---
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, 'uploads/'); 
+        cb(null, 'uploads/');
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -195,7 +196,7 @@ app.get('/suporte', (req, res) => {
 // --- 6. DASHBOARD (PROJETADO PARA O OTINIEL E EQUIPA) ---
 app.get('/dashboard', (req, res) => {
     // 1. Pegar os dados reais do utilizador que está na sessão
-    const user = req.session.user; 
+    const user = req.session.user;
 
     if (!user) {
         return res.redirect('/login'); // Se não houver user real, volta ao login
@@ -203,7 +204,7 @@ app.get('/dashboard', (req, res) => {
 
     // 2. Consulta real à base de dados para os ficheiros
     const query = "SELECT * FROM ficheiros WHERE departamento = ?";
-    
+
     db.all(query, [user.departamento], (err, files) => {
         if (err) {
             console.error("Erro na BD:", err);
@@ -223,6 +224,14 @@ app.post('/upload', upload.single('ficheiro'), (req, res) => {
     if (!req.file || !req.session.user) return res.send("Erro: Utilizador não autenticado ou ficheiro ausente.");
 
     const nomeOriginal = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+    // Validação do tipo de ficheiro (extensões permitidas)
+    const allowed = ['pdf','docx','pptx','xlsm'];
+    const ext = nomeOriginal.split('.').pop().toLowerCase();
+    if (!allowed.includes(ext)) {
+        // Remove ficheiro guardado pelo multer
+        try { fs.unlinkSync(path.join(__dirname, 'uploads', req.file.filename)); } catch (e) { /* ignore */ }
+        return res.send(renderError('Tipo inválido', 'Apenas ficheiros PDF, DOCX, PPTX e XLSM são permitidos.', 'warning'));
+    }
     const user = req.session.user; // Facilitar o acesso aos dados do user
     const agora = new Date();
 
@@ -230,7 +239,7 @@ app.post('/upload', upload.single('ficheiro'), (req, res) => {
     const sqlFicheiro = "INSERT INTO ficheiros (nome_original, nome_servidor, departamento, usuario_id, data_upload) VALUES (?, ?, ?, ?, ?)";
     const paramsFicheiro = [nomeOriginal, req.file.filename, req.body.departamento, user.id, agora.toISOString()];
 
-    db.run(sqlFicheiro, paramsFicheiro, function(err) {
+    db.run(sqlFicheiro, paramsFicheiro, function (err) {
         if (err) {
             console.error("Erro ao guardar ficheiro:", err.message);
             return res.send("Erro ao guardar na BD");
@@ -246,7 +255,7 @@ app.post('/upload', upload.single('ficheiro'), (req, res) => {
 
         db.run(sqlLog, paramsLog, (errLog) => {
             if (errLog) console.error("⚠️ Erro ao gravar Log de Upload:", errLog.message);
-            
+
             // Redireciona apenas após tentar gravar o log
             res.redirect('/dashboard');
         });
@@ -259,14 +268,14 @@ app.post('/tornar-chefe', (req, res) => {
     const user = req.session.user;
 
     // DEFINA AQUI O SEU CÓDIGO REAL (Exemplo: '1234')
-    const CODIGO_CORRETO = '1234'; 
+    const CODIGO_CORRETO = '1234';
 
     if (!user) return res.redirect('/login');
 
     if (codigo_secreto === CODIGO_CORRETO) {
         // CASO CERTO: Atualiza a sessão e volta à dashboard
         req.session.user.cargo = 'admin';
-        
+
         // Garantir que a sessão é gravada antes do redirect
         req.session.save(() => {
             res.redirect('/dashboard');
@@ -275,8 +284,8 @@ app.post('/tornar-chefe', (req, res) => {
         // CASO ERRADO: Usa a função renderError do teu renders.js
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         const htmlErro = renderError(
-            'Acesso Negado', 
-            'O código secreto inserido está incorreto. Tenta novamente.', 
+            'Acesso Negado',
+            'O código secreto inserido está incorreto. Tenta novamente.',
             'error'
         );
         res.send(htmlErro);
@@ -292,8 +301,8 @@ app.get('/sair-modo-chefe', (req, res) => {
 
     // 2. Atualizar permanentemente na Base de Dados para 'comum'
     const sql = "UPDATE usuarios SET cargo = 'comum' WHERE id = ?";
-    
-    db.run(sql, [userId], function(err) {
+
+    db.run(sql, [userId], function (err) {
         if (err) {
             console.error("Erro ao sair do modo chefe:", err.message);
             return res.send(renderError("Erro", "Não foi possível alterar o cargo.", "error"));
@@ -316,13 +325,13 @@ app.get('/admin/alterar-cargo/:id/:novoCargo', (req, res) => {
         return res.send(renderError("Acesso Negado", "Não tens permissão.", "error"));
     }
 
-    const idParaAlterar = req.params.id; 
+    const idParaAlterar = req.params.id;
     const novoCargo = req.params.novoCargo;
 
     const sql = "UPDATE usuarios SET cargo = ? WHERE id = ?";
-    
+
     // ATENÇÃO: Usamos 'function(err)' e NÃO '(err) =>' para o 'this.changes' funcionar
-    db.run(sql, [novoCargo, idParaAlterar], function(err) {
+    db.run(sql, [novoCargo, idParaAlterar], function (err) {
         if (err) {
             console.error("❌ Erro SQL:", err.message);
             return res.send(renderError("Erro", err.message, "error"));
@@ -375,7 +384,7 @@ app.get('/eliminar/:id', (req, res) => {
 
             db.run(sqlLog, paramsLog, (errLog) => {
                 if (errLog) console.error("⚠️ Erro ao gravar Log de Eliminação:", errLog.message);
-                
+
                 // Redireciona para a Dashboard após tudo estar concluído
                 res.redirect('/dashboard');
             });
@@ -389,10 +398,10 @@ app.get('/perfil', (req, res) => {
 
     // Consulta real para contar uploads do usuário
     const sqlUploads = "SELECT COUNT(*) as total FROM ficheiros WHERE usuario_id = ?";
-    
+
     db.get(sqlUploads, [user.id], (err, row) => {
         const totalUploads = row ? row.total : 0;
-        
+
         const estatisticas = {
             uploads: totalUploads
         };
@@ -403,25 +412,42 @@ app.get('/perfil', (req, res) => {
     });
 });
 
+// Evita eliminação via GET: redireciona para perfil (usar POST com confirmação)
 app.get('/eliminar-conta', (req, res) => {
+    return res.redirect('/perfil');
+});
+
+// Eliminar conta (POST) — exige confirmação de senha
+app.post('/eliminar-conta', (req, res) => {
     const user = req.session.user;
     if (!user) return res.redirect('/login');
 
+    const { senha_confirmacao } = req.body;
+    if (!senha_confirmacao) return res.send(renderError('Erro', 'É necessário inserir a senha para confirmar.', 'warning'));
+
     const userId = user.id;
 
-    db.run("DELETE FROM usuarios WHERE id = ?", [userId], function(err) {
-        if (err) {
-            console.error(err.message);
-            return res.redirect('/perfil?error=delete_failed');
-        }
+    db.get('SELECT senha FROM usuarios WHERE id = ?', [userId], async (err, row) => {
+        if (err || !row) return res.send(renderError('Erro', 'Utilizador inválido.', 'error'));
 
-        // Destruímos a sessão e mandamos para o login com o status 'deleted'
-        req.session.destroy((err) => {
-            if (err) return res.redirect('/');
-            
-            // REDIRECIONAMENTO SILENCIOSO
-            res.redirect('/login?status=deleted');
-        });
+        try {
+            const valido = await bcrypt.compare(senha_confirmacao, row.senha);
+            if (!valido) return res.send(renderError('Erro', 'Senha incorreta. A conta não foi eliminada.', 'error'));
+
+            db.run('DELETE FROM usuarios WHERE id = ?', [userId], function (delErr) {
+                if (delErr) {
+                    console.error(delErr.message);
+                    return res.send(renderError('Erro', 'Não foi possível eliminar a conta.', 'error'));
+                }
+
+                req.session.destroy((sessErr) => {
+                    if (sessErr) console.error('Erro ao destruir sessão após eliminação:', sessErr.message);
+                    res.redirect('/login?status=deleted');
+                });
+            });
+        } catch (e) {
+            return res.send(renderError('Erro', 'Falha na verificação da senha.', 'error'));
+        }
     });
 });
 
@@ -445,7 +471,7 @@ app.post('/perfil/atualizar', async (req, res) => {
         try {
             // Caso o usuário queira mudar a senha
             if (password && password.trim() !== "") {
-                
+
                 // Validação de tamanho
                 if (password.length < 6) {
                     return res.send(renderError("Senha Curta", "A nova palavra-passe deve ter pelo menos 6 caracteres.", "warning"));
@@ -469,7 +495,7 @@ app.post('/perfil/atualizar', async (req, res) => {
             }
 
             // 2. Executar a atualização final
-            db.run(sql, params, function(err) {
+            db.run(sql, params, function (err) {
                 if (err) {
                     console.error("❌ ERRO SQL UPDATE:", err.message);
                     return res.send(renderError("Erro", "Não foi possível atualizar os dados.", "error"));
@@ -509,12 +535,12 @@ app.post('/perfil/atualizar', async (req, res) => {
 // ROTA: Listar utilizadores E registos de atividade para o Chefe
 app.get('/admin/utilizadores', (req, res) => {
     const userLogado = req.session.user; // Pega os dados de quem está logado
-    
+
     if (!userLogado) return res.redirect('/login');
 
     // FILTRO: Só seleciona utilizadores do MESMO departamento que o admin logado
     const sqlUsers = "SELECT id, nome, departamento, cargo FROM usuarios WHERE departamento = ? ORDER BY nome ASC";
-    
+
     db.all(sqlUsers, [userLogado.departamento], (err, users) => {
         if (err) return res.send("Erro ao carregar lista.");
 
@@ -533,14 +559,17 @@ app.get('/admin/utilizadores', (req, res) => {
 });
 
 app.get('/logout', (req, res) => {
-    // 1. Destruir a sessão (se usar express-session)
-    if (req.session) {
-        req.session.destroy();
+    if (!req.session) {
+        res.clearCookie('connect.sid');
+        return res.redirect('/login');
     }
-    // 2. Limpar o cookie do navegador
-    res.clearCookie('connect.sid'); 
-    // 3. Mandar para a página de login
-    res.redirect('/login');
+
+    req.session.destroy((err) => {
+        // mesmo em caso de erro, limpar cookie e mandar para o login
+        res.clearCookie('connect.sid');
+        if (err) console.error('Erro ao destruir sessão:', err);
+        return res.redirect('/login');
+    });
 });
 
 // Rota para baixar ficheiro e registar a ação para o Admin
@@ -560,10 +589,10 @@ app.get('/download/:id', (req, res) => {
         // 2. ESCREVER NO LOG (O que o Admin vai ver)
         const sqlLog = "INSERT INTO logs_atividade (usuario_nome, acao, ficheiro_nome, data_formatada, hora) VALUES (?, ?, ?, ?, ?)";
         const paramsLog = [
-            user.nome, 
-            'DOWNLOAD', 
-            row.nome_original, 
-            agora.toLocaleDateString('pt-AO'), 
+            user.nome,
+            'DOWNLOAD',
+            row.nome_original,
+            agora.toLocaleDateString('pt-AO'),
             agora.toLocaleTimeString('pt-AO', { hour: '2-digit', minute: '2-digit' })
         ];
 

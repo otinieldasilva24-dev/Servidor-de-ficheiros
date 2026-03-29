@@ -2,10 +2,14 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const db = require('../config/database');
-const { headerPadrao, renderError } = require('../utils/renders');
+const { headerPadrao, renderError, renderSuperAdminDashboard } = require('../utils/renders');
 
 // --- LOGIN (GET) ---
 router.get('/login', (req, res) => {
+    // Se já existe sessão, redireciona para o painel correspondente
+    if (req.session && req.session.superadm) return res.redirect('/superadmin');
+    if (req.session && req.session.user) return res.redirect('/dashboard');
+
     res.send(`
         <!DOCTYPE html>
         <html lang="pt">
@@ -13,6 +17,7 @@ router.get('/login', (req, res) => {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <script src="https://cdn.tailwindcss.com"></script>
+            <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
             <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
             <title>INAMET | Login</title>
@@ -28,7 +33,7 @@ router.get('/login', (req, res) => {
         <body class="bg-white antialiased">
             ${headerPadrao}
             <main class="h-screen w-full flex flex-col items-center justify-center px-6 overflow-hidden">
-                <div class="w-full max-w-[440px] glass-card rounded-[3rem] p-8 animate__animated animate__fadeInUp">
+                <div class="w-full max-w-[440px] glass-card rounded-[3rem] p-8 animate__animated animate__fadeInUp relative">
                     <div class="mb-8 text-center">
                         <h2 class="text-3xl font-800 text-slate-800 tracking-tighter uppercase">Portal <span class="text-blue-700">Login</span></h2>
                         <div class="h-1 w-12 bg-blue-600 mx-auto mt-2 rounded-full"></div>
@@ -47,12 +52,47 @@ router.get('/login', (req, res) => {
                         </div>
                         <button type="submit" class="btn-primary w-full text-white py-4 rounded-2xl font-bold uppercase tracking-[0.15em] text-xs shadow-lg mt-2">Aceder ao Painel</button>
                     </form>
+
+                    <div class="mt-4">
+                        <button type="button" onclick="tornarMeAdmin()" class="w-full text-amber-700 border border-amber-200 bg-amber-50 px-4 py-3 rounded-2xl font-bold text-[13px] hover:bg-amber-100">Tornar-me ADM</button>
+                    </div>
                     <div class="mt-8 pt-6 border-t border-slate-50 text-center flex flex-col gap-2">
                         <a href="/" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">← Voltar ao Início</a>
                         <p class="text-xs text-slate-400 font-medium">Não tem conta? <a href="/registo" class="text-blue-600 font-bold hover:underline ml-1">Solicitar Acesso</a></p>
                     </div>
                 </div>
             </main>
+                <script>
+                function tornarMeAdmin() {
+                    Swal.fire({
+                        title: 'Código de Confirmação',
+                        input: 'password',
+                        inputPlaceholder: 'Insira o código de confirmação',
+                        showCancelButton: true,
+                        confirmButtonText: 'Validar',
+                        cancelButtonText: 'Cancelar',
+                        confirmButtonColor: '#1d4ed8',
+                        inputAttributes: { autocapitalize: 'off', autocorrect: 'off' }
+                    }).then((result) => {
+                        if (!result.value) return;
+                        fetch('/superadmin/activate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ codigo: result.value })
+                        }).then(response => {
+                            if (response.redirected) {
+                                window.location.href = response.url;
+                                return;
+                            }
+                            return response.text();
+                        }).then(html => {
+                            if (html) { document.open(); document.write(html); document.close(); }
+                        }).catch(() => {
+                            Swal.fire('Erro', 'Erro de rede. Tente novamente.', 'error');
+                        });
+                    });
+                }
+                </script>
         </body>
         </html>`);
 });
@@ -273,3 +313,45 @@ router.post('/atualizar-senha', async (req, res) => {
 });
 
 module.exports = router;
+
+// --- ROTAS DO SUPER-ADMIN (ADM GERAL, SEM LOGIN) ---
+// Ativação via código: seta `req.session.superadm = true`
+router.post('/superadmin/activate', (req, res) => {
+    const codigo = (req.body && (req.body.codigo || req.body.codigo_secreto)) || '';
+    const CODIGO_SUPER = process.env.SUPER_ADMIN_CODE || 'INAMET-ADM-2026';
+
+    if (codigo === CODIGO_SUPER) {
+        req.session.superadm = true;
+        req.session.save(() => { res.redirect('/superadmin'); });
+    } else {
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.send(renderError('Acesso Negado', 'Código incorreto. Tenta novamente.', 'error'));
+    }
+});
+
+// Página do SuperAdmin (acesso global)
+router.get('/superadmin', (req, res) => {
+    if (!req.session.superadm) return res.redirect('/login');
+
+    // Pega todos os utilizadores, ficheiros e logs
+    db.all('SELECT id, nome, departamento, cargo FROM usuarios ORDER BY nome ASC', [], (errUsers, users) => {
+        if (errUsers) return res.send(renderError('Erro', 'Falha ao carregar utilizadores.', 'error'));
+
+        db.all('SELECT * FROM ficheiros ORDER BY id DESC LIMIT 200', [], (errFiles, files) => {
+            if (errFiles) return res.send(renderError('Erro', 'Falha ao carregar ficheiros.', 'error'));
+
+            db.all('SELECT * FROM logs_atividade ORDER BY id DESC LIMIT 200', [], (errLogs, logs) => {
+                if (errLogs) return res.send(renderError('Erro', 'Falha ao carregar logs.', 'error'));
+
+                res.setHeader('Content-Type', 'text/html; charset=utf-8');
+                res.send(renderSuperAdminDashboard(users || [], files || [], logs || []));
+            });
+        });
+    });
+});
+
+// Desativar SuperAdmin
+router.get('/superadmin/logout', (req, res) => {
+    req.session.superadm = false;
+    req.session.save(() => res.redirect('/login'));
+});

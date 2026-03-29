@@ -1,4 +1,4 @@
-const db = require('./config/database'); 
+const db = require('./config/database');
 
 // Tabelas na ordem correta para evitar conflitos de chaves
 const tabelas = ['ficheiros', 'logs_atividade', 'usuarios'];
