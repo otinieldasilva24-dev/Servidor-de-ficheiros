@@ -584,21 +584,12 @@ app.post('/superadmin/editar-usuario', async (req, res) => {
 
 // --- ROTA: Eliminar utilizador (apenas SuperAdmin) ---
 app.post('/superadmin/eliminar-usuario/:id', (req, res) => {
-    if (!req.session || !req.session.superadm) return res.send(renderError('Acesso Negado', 'Apenas o SuperAdmin pode eliminar utilizadores.', 'error'));
-
+    if (!req.session.superadm) return res.send("Acesso Negado");
+    
     const id = req.params.id;
-    // Não permitir que o SuperAdmin se elimine a si próprio via painel
-    if (req.session.user && String(req.session.user.id) === String(id)) {
-        return res.send(renderError('Ação Inválida', 'Não pode eliminar a sua própria conta enquanto estiver logado.', 'warning'));
-    }
-
-    const sql = "DELETE FROM usuarios WHERE id = ?";
-    db.run(sql, [id], function (err) {
-        if (err) {
-            console.error('Erro ao eliminar utilizador:', err.message);
-            return res.send(renderError('Erro', 'Não foi possível eliminar o utilizador.', 'error'));
-        }
-        return res.redirect('/superadmin');
+    db.run('DELETE FROM usuarios WHERE id = ?', [id], (err) => {
+        if (err) return res.send("Erro ao eliminar");
+        res.redirect('/superadmin'); // Redireciona de volta para a lista
     });
 });
 

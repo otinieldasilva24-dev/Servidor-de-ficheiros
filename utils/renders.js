@@ -541,7 +541,11 @@ function renderSuperAdminDashboard(users = [], files = [], logs = []) {
             <td class="px-4 py-3">
                 <div class="flex items-center justify-between">
                     <button type="button" onclick="abrirModalEditarUsuario(${u.id})" class="px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-bold hover:bg-blue-100">Editar</button>
-                    <button type="button" onclick="confirmarEliminarUsuario(${u.id})" class="px-3 py-2 rounded-lg bg-red-50 text-red-600 text-sm font-black hover:bg-red-100">Eliminar</button>
+                  <button type="button" 
+        onclick="confirmarEliminarUsuario('${u.id}')" 
+        class="px-3 py-2 rounded-lg bg-red-50 text-red-600 text-sm font-black hover:bg-red-100">
+    Eliminar
+                 </button>
                 </div>
             </td>
         </tr>
@@ -568,6 +572,7 @@ function renderSuperAdminDashboard(users = [], files = [], logs = []) {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
         <title>Admin Geral - INAMET</title>
         <script src="https://cdn.tailwindcss.com"></script>
     </head>
