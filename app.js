@@ -584,12 +584,40 @@ app.post('/superadmin/editar-usuario', async (req, res) => {
 
 // --- ROTA: Eliminar utilizador (apenas SuperAdmin) ---
 app.post('/superadmin/eliminar-usuario/:id', (req, res) => {
-    if (!req.session.superadm) return res.send("Acesso Negado");
-    
-    const id = req.params.id;
-    db.run('DELETE FROM usuarios WHERE id = ?', [id], (err) => {
-        if (err) return res.send("Erro ao eliminar");
-        res.redirect('/superadmin'); // Redireciona de volta para a lista
+    // 1. Verificação de Segurança (Apenas SuperAdmin)
+    if (!req.session.superadm) return res.status(403).send("Acesso Negado");
+
+    const userId = req.params.id;
+
+    // 2. Buscar o nome do usuário antes de o eliminar para poder registar no log
+    db.get('SELECT nome FROM usuarios WHERE id = ?', [userId], (err, user) => {
+        if (err || !user) return res.send("Utilizador não encontrado");
+
+        const nomeUsuarioEliminado = user.nome;
+
+        // 3. Eliminar o utilizador da tabela 'usuarios'
+        db.run('DELETE FROM usuarios WHERE id = ?', [userId], function(err) {
+            if (err) return res.send("Erro ao eliminar utilizador");
+
+            // 4. REGISTAR A ATIVIDADE: Usando o nome correto 'logs_atividade'
+            const queryLog = `
+                INSERT INTO logs_atividade (usuario_nome, acao, ficheiro_nome, data_formatada, hora) 
+                VALUES (?, ?, ?, ?, ?)`;
+            
+            const agora = new Date();
+            const data = agora.toLocaleDateString('pt-PT');
+            const hora = agora.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+
+            // 'SuperAdmin' realizou a ação 'ELIMINAR' sobre o usuário 'nomeUsuarioEliminado'
+            db.run(queryLog, ['SuperAdmin', 'ELIMINAR', nomeUsuarioEliminado, data, hora], (errLog) => {
+                if (errLog) {
+                    console.error("Erro ao gravar log no terminal:", errLog);
+                }
+                
+                // 5. Redirecionar de volta para o painel de controlo
+                res.redirect('/superadmin');
+            });
+        });
     });
 });
 
