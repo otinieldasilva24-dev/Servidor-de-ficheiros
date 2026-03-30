@@ -46,7 +46,6 @@ router.get('/login', (req, res) => {
                         <div>
                             <div class="flex justify-between items-center mb-1.5 ml-1">
                                 <label class="text-[9px] font-extrabold text-slate-400 uppercase tracking-[0.2em]">Palavra-passe</label>
-                                <a href="/recuperar-senha" class="text-[9px] font-bold text-blue-600 uppercase">Esqueceu?</a>
                             </div>
                             <input type="password" name="senha" required placeholder="••••••••" class="input-field w-full px-5 py-3.5 rounded-2xl bg-slate-50 text-sm text-slate-700">
                         </div>
@@ -58,7 +57,7 @@ router.get('/login', (req, res) => {
                     </div>
                     <div class="mt-8 pt-6 border-t border-slate-50 text-center flex flex-col gap-2">
                         <a href="/" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">← Voltar ao Início</a>
-                        <p class="text-xs text-slate-400 font-medium">Não tem conta? <a href="https://mail.google.com/mail/?view=cm&fs=1&to=${process.env.ADMIN_EMAIL || 'robertozua161@gmail.com'}&su=${encodeURIComponent('Solicitação de Acesso - INAMET')}&body=${encodeURIComponent('Olá Admin,\r\n\r\nGostaria de solicitar acesso ao portal INAMET.\r\n\r\nNome:\r\nE-mail:\r\nDepartamento:\r\n\r\nObrigado.')}" target="_blank" class="text-blue-600 font-bold hover:underline ml-1">Solicitar Acesso</a></p>
+                        <p class="text-xs text-slate-400 font-medium">Não tem conta? <a href="https://mail.google.com/mail/?view=cm&fs=1&to=${process.env.ADMIN_EMAIL || 'robertozua161@gmail.com'}&su=${encodeURIComponent('Solicitação de Acesso - INAMET')}&body=${encodeURIComponent('Olá Admin,\r\n\r\nGostaria de solicitar acesso ao portal INAMET.\r\n\r\nNome Completo:\r\nE-mail:\r\nDepartamento:\r\n\r\nObrigado.')}" target="_blank" class="text-blue-600 font-bold hover:underline ml-1">Solicitar Acesso</a></p>
                     </div>
                 </div>
             </main>
@@ -232,110 +231,6 @@ router.post('/registo', async (req, res) => {
     } catch (e) {
         res.send(renderError('Erro', 'Falha no servidor', 'error'));
     }
-});
-
-// --- RECUPERAR SENHA (GET) ---
-router.get('/recuperar-senha', (req, res) => {
-    res.send(`
-        <!DOCTYPE html>
-        <html lang="pt">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <script src="https://cdn.tailwindcss.com"></script>
-            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
-            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
-            <title>INAMET | Recuperar Acesso</title>
-            <style>
-                body { font-family: 'Inter', sans-serif; overflow: hidden; }
-                .glass-card { background: #ffffff; border: 1px solid #f1f5f9; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05); }
-                .input-field { transition: all 0.2s ease; border: 1.5px solid #f1f5f9; }
-                .input-field:focus { border-color: #2563eb; outline: none; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1); }
-            </style>
-        </head>
-        <body class="bg-white">
-            ${headerPadrao}
-            <main class="h-screen w-full flex flex-col items-center justify-center px-6">
-                <div class="w-full max-w-[440px] glass-card rounded-[3rem] p-10 animate__animated animate__fadeInUp text-center">
-                    <div class="w-16 h-16 bg-blue-50 text-blue-700 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4">🔑</div>
-                    <h2 class="text-3xl font-800 text-slate-800 tracking-tighter uppercase mb-6">Recuperar <span class="text-blue-700">Senha</span></h2>
-                    <form action="/recuperar-senha" method="POST" class="space-y-6">
-                        <input type="email" name="email" required placeholder="exemplo@inamet.gov.ao" class="input-field w-full px-5 py-4 rounded-2xl bg-slate-50 text-sm">
-                        <button type="submit" class="w-full bg-blue-700 text-white py-4 rounded-2xl font-bold uppercase text-xs shadow-lg">Verificar E-mail</button>
-                    </form>
-                    <a href="/login" class="block mt-8 text-[10px] font-bold text-slate-400 uppercase">← Voltar ao Login</a>
-                </div>
-            </main>
-        </body>
-        </html>
-    `);
-});
-
-// --- RECUPERAR SENHA (POST) ---
-router.post('/recuperar-senha', (req, res) => {
-    const { email } = req.body;
-    db.get(`SELECT id FROM usuarios WHERE email = ?`, [email], (err, user) => {
-        if (err || !user) {
-            return res.send(renderError('Erro', 'E-mail não encontrado no sistema.', 'error'));
-        }
-        res.redirect(`/nova-senha?id=${user.id}`);
-    });
-});
-
-// --- NOVA SENHA (GET) ---
-router.get('/nova-senha', (req, res) => {
-    const userId = req.query.id;
-    if (!userId) return res.redirect('/login');
-    res.send(`
-        <!DOCTYPE html>
-        <html lang="pt">
-        <head>
-            <meta charset="UTF-8">
-            <script src="https://cdn.tailwindcss.com"></script>
-            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
-            <title>INAMET | Nova Senha</title>
-        </head>
-        <body class="bg-white flex items-center justify-center h-screen">
-            ${headerPadrao}
-            <div class="w-full max-w-[440px] p-8 border border-slate-100 shadow-2xl rounded-[3rem]">
-                <h2 class="text-2xl font-800 text-slate-800 mb-6 text-center uppercase">Definir <span class="text-blue-700">Nova Senha</span></h2>
-                <form action="/atualizar-senha" method="POST" class="space-y-4">
-                    <input type="hidden" name="userId" value="${userId}">
-                    <input type="password" name="novaSenha" required placeholder="Nova Palavra-passe" class="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:border-blue-600 outline-none transition-all">
-                    <button type="submit" class="w-full bg-blue-700 text-white py-4 rounded-2xl font-bold uppercase text-xs shadow-lg">Atualizar Senha</button>
-                </form>
-            </div>
-        </body>
-        </html>
-    `);
-});
-
-// --- ATUALIZAR SENHA (POST) ---
-router.post('/atualizar-senha', async (req, res) => {
-    const { userId, novaSenha } = req.body;
-    if (!novaSenha || novaSenha.length < 6) {
-        return res.send(renderError('Segurança', 'A senha deve ter pelo menos 6 caracteres.', 'warning'));
-    }
-
-    db.get(`SELECT senha FROM usuarios WHERE id = ?`, [userId], async (err, user) => {
-        if (err || !user) return res.send(renderError('Erro', 'Utilizador inválido.', 'error'));
-
-        const senhasIguais = await bcrypt.compare(novaSenha, user.senha);
-        if (senhasIguais) return res.send(renderError('Segurança', 'A nova senha não pode ser igual à antiga.', 'warning'));
-
-        const novoHash = await bcrypt.hash(novaSenha, 10);
-        db.run(`UPDATE usuarios SET senha = ? WHERE id = ?`, [novoHash, userId], (updateErr) => {
-            if (updateErr) return res.send(renderError('Erro', 'Falha ao salvar senha.', 'error'));
-            res.send(`
-                <html>
-                <head><script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script></head>
-                <body><script>
-                    Swal.fire({ icon: 'success', title: 'SENHA ATUALIZADA', text: 'Pode agora aceder ao portal.', confirmButtonColor: '#1d4ed8' })
-                    .then(() => { window.location.href = '/login'; });
-                </script></body></html>
-            `);
-        });
-    });
 });
 
 module.exports = router;
