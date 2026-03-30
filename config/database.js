@@ -16,8 +16,11 @@ db.serialize(() => {
         email TEXT UNIQUE NOT NULL,
         senha TEXT NOT NULL,
         departamento TEXT NOT NULL,
-        cargo TEXT DEFAULT 'comum'
+        cargo TEXT DEFAULT 'usuário'
     )`);
+
+    // Atualiza registros existentes que ainda usam o cargo antigo 'comum' para 'usuário'
+    db.run(`UPDATE usuarios SET cargo = 'usuário' WHERE cargo = 'comum'`);
 
     // Tabela de Ficheiros
     db.run(`CREATE TABLE IF NOT EXISTS ficheiros (

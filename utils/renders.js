@@ -31,7 +31,6 @@ function getFileInfo(filename) {
         'xlsm': { icon: '📗', bg: 'bg-green-50', text: 'text-green-500' },
         'pptx': { icon: '📙', bg: 'bg-amber-50', text: 'text-amber-500' },
         'png': { icon: '🖼️', bg: 'bg-purple-50', text: 'text-purple-500' },
-        'jpg': { icon: '🖼️', bg: 'bg-purple-50', text: 'text-purple-500' },
         'jpeg': { icon: '🖼️', bg: 'bg-purple-50', text: 'text-purple-500' },
         'zip': { icon: '📦', bg: 'bg-amber-50', text: 'text-amber-500' },
         'rar': { icon: '📦', bg: 'bg-amber-50', text: 'text-amber-500' }
@@ -64,20 +63,6 @@ function renderModais(user) {
             </div>
         </div>
 
-        <div id="modalChefe" class="fixed inset-0 modal-bg z-[100] hidden flex items-center justify-center p-6">
-            <div class="bg-white w-full max-w-sm rounded-[2.5rem] p-10 animate-fade text-center">
-                <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-6">🛡️</div>
-                <h3 class="text-2xl font-800 text-slate-800 mb-2 uppercase tracking-tight">Modo <span class="text-blue-600">Chefe</span></h3>
-                <p class="text-slate-500 text-sm mb-8 font-medium italic">Insira o código de autorização.</p>
-                <form action="/tornar-chefe" method="POST" class="space-y-5">
-                    <input type="password" name="codigo_secreto" required class="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-center text-lg font-bold tracking-[0.5em] outline-none focus:border-blue-600 transition-all">
-                    <div class="flex gap-3">
-                        <button type="button" onclick="fecharModalChefe()" class="flex-1 px-6 py-4 text-slate-400 font-bold text-[10px] uppercase">Fechar</button>
-                        <button type="submit" class="flex-1 px-6 py-4 bg-blue-600 text-white rounded-2xl font-bold text-[10px] uppercase shadow-lg">Validar</button>
-                    </div>
-                </form>
-            </div>
-        </div>
 
         <script>
             function handleFileSelect(input) {
@@ -109,17 +94,17 @@ function renderModais(user) {
 
             function abrirModal() { document.getElementById('modalUpload').classList.remove('hidden'); }
             function fecharModal() { document.getElementById('modalUpload').classList.add('hidden'); }
-            function abrirModalChefe() { document.getElementById('modalChefe').classList.remove('hidden'); }
-            function fecharModalChefe() { document.getElementById('modalChefe').classList.add('hidden'); }
-        </script>
+            // Modo Chefe promovido: remoção da opção de auto-promoção; gerir cargos apenas via SuperAdmin
+          </script>
     `;
 }
 
 // ==========================================
 // 3. PÁGINA: GESTÃO DE UTILIZADORES
 // ==========================================
-const renderGestaoUtilizadores = (users, logs = []) => {
-    // Renderização da Tabela de Usuários (Membros da Equipa)
+const renderGestaoUtilizadores = (users, logs = [], opts = {}) => {
+    const isSuperadm = !!opts.superadm;
+    // Renderização da Tabela de Usuários (Usuários da Equipa)
     const rows = users.map(u => `
         <tr class="hover:bg-slate-50/50 transition-all group">
             <td class="px-8 py-5">
@@ -136,14 +121,16 @@ const renderGestaoUtilizadores = (users, logs = []) => {
             <td class="px-8 py-5 text-slate-500 text-xs font-semibold">${u.departamento}</td>
             <td class="px-8 py-5 text-center">
                 <span class="px-3 py-1 rounded-lg text-[9px] font-black uppercase ${u.cargo === 'admin' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}">
-                    ${u.cargo === 'admin' ? '🛡️ Chefe' : '👤 Membro'}
+                    ${u.cargo === 'admin' ? '🛡️ Chefe' : '👤 Usuário'}
                 </span>
             </td>
             <td class="px-8 py-5 text-center">
-                <a href="/admin/alterar-cargo/${u.id}/${u.cargo === 'admin' ? 'comum' : 'admin'}" 
+                ${isSuperadm ? `
+                <a href="/admin/alterar-cargo/${u.id}/${u.cargo === 'admin' ? 'usuário' : 'admin'}" 
                    class="px-5 py-2 rounded-xl text-[9px] font-black uppercase transition-all border border-slate-200 text-slate-400 hover:border-blue-600 hover:text-blue-600">
                     Alternar Cargo
                 </a>
+                ` : `<span class="text-[9px] text-slate-400 font-bold uppercase">Sem permissão</span>`}
             </td>
         </tr>
     `).join('');
@@ -186,6 +173,10 @@ const renderGestaoUtilizadores = (users, logs = []) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Gestão e Auditoria - INAMET</title>
         <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
         <style>
             @keyframes fade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
             .animate-fade { animation: fade 0.4s ease-out forwards; }
@@ -210,6 +201,7 @@ const renderGestaoUtilizadores = (users, logs = []) => {
                         <span class="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Equipa</span>
                         <span class="text-xl font-black text-slate-800">${users.length}</span>
                     </div>
+                    <!-- Criar Conta removido para que apenas SuperAdmin possa criar contas -->
                     <a href="/dashboard" class="h-14 flex items-center bg-blue-600 text-white px-8 rounded-2xl text-[10px] font-black uppercase shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all">
                         Voltar
                     </a>
@@ -219,7 +211,7 @@ const renderGestaoUtilizadores = (users, logs = []) => {
             <div class="grid lg:grid-cols-3 gap-8 items-start">
                 <div class="lg:col-span-2 bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
                     <div class="p-6 border-b border-slate-50 bg-slate-50/30">
-                        <h3 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Membros do Departamento</h3>
+                        <h3 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Usuários do Departamento</h3>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left border-collapse">
@@ -365,8 +357,7 @@ const renderDashboard = (user, files = []) => {
 
                         ${ehChefe ? `
                             <a href="/admin/utilizadores" class="h-12 flex items-center gap-2 bg-white border border-slate-200 px-5 rounded-2xl text-[11px] font-bold uppercase text-slate-600 hover:bg-slate-50 transition-all shadow-sm cursor-pointer">Equipa</a>
-                            <a href="/sair-modo-chefe" class="h-12 flex items-center gap-2 bg-amber-50 border border-amber-200 px-5 rounded-2xl text-[11px] font-bold uppercase text-amber-600 hover:bg-amber-100 transition-all shadow-sm cursor-pointer">Sair Chefe</a>
-                        ` : `<button onclick="abrirModalChefe()" class="h-12 flex items-center gap-2 bg-white border border-slate-200 px-5 rounded-2xl text-[11px] font-bold uppercase text-slate-600 hover:bg-slate-50 transition-all shadow-sm cursor-pointer">🛡️ Modo Chefe</button>`}
+                        ` : ``}
                         
                         <button onclick="abrirModal()" class="h-12 flex items-center gap-2 bg-blue-600 text-white px-6 rounded-2xl text-[11px] font-bold uppercase shadow-lg hover:bg-blue-700 transition-all cursor-pointer">📤 Carregar</button>
                     </div>
@@ -387,8 +378,6 @@ const renderDashboard = (user, files = []) => {
         <script>
             function abrirModal() { document.getElementById('modalUpload').classList.remove('hidden'); }
             function fecharModal() { document.getElementById('modalUpload').classList.add('hidden'); }
-            function abrirModalChefe() { document.getElementById('modalChefe').classList.remove('hidden'); }
-            function fecharModalChefe() { document.getElementById('modalChefe').classList.add('hidden'); }
             function confirmarEliminacao(id, nomeFicheiro) {
                 Swal.fire({
                     title: 'ELIMINAR?',
@@ -489,13 +478,7 @@ const renderPerfil = (user, estatisticas) => {
 
                             <div class="mt-12 pt-6 border-t border-slate-100">
                                 <h3 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Zona de Perigo</h3>
-                                <button onclick="confirmarExclusao()" 
-                                        class="flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-3 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-600 hover:text-white transition-all duration-300">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                    Eliminar Minha Conta
-                                </button>
+                                <p class="text-xs text-slate-500">A eliminação de contas só pode ser feita pelo Administrador Geral (SuperAdmin). Contacte o SuperAdmin para quaisquer ações administrativas.</p>
                             </div>
                         </div>
                     </div>
@@ -505,73 +488,7 @@ const renderPerfil = (user, estatisticas) => {
 
         
 
-                        <div id="modalExclusao" 
-     class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4 transition-opacity duration-300 opacity-0">
-    
-    <div class="bg-white max-w-md w-full rounded-[3rem] shadow-2xl p-8 text-center transform scale-95 transition-transform duration-300 ease-out border border-slate-100">
-        <div class="w-20 h-20 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-md">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-        </div>
-
-        <h3 class="text-2xl font-black text-slate-800 mb-2 uppercase tracking-tight">Eliminar <span class="text-red-600">Conta?</span></h3>
-        <p class="text-slate-500 mb-6 leading-relaxed text-sm p-2 bg-slate-50 rounded-2xl border border-slate-100">
-            Esta ação é <strong class="text-slate-800">irreversível</strong>. Todos os teus ficheiros e dados do <strong class="text-blue-700">INAMET</strong> serão apagados permanentemente do sistema.
-        </p>
-
-        <form action="/eliminar-conta" method="POST" class="mt-4 w-full">
-            <input name="senha_confirmacao" required type="password" placeholder="Insira a sua senha para confirmar" 
-                   class="w-full px-4 py-3 border border-slate-100 rounded-2xl outline-none focus:border-red-600 placeholder-slate-400 mb-4">
-
-            <div class="flex flex-col sm:flex-row gap-3">
-                <button type="button" onclick="fecharModalExclusao()" 
-                        class="w-full sm:w-auto px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95">
-                    Não, Cancelar
-                </button>
-
-                <button type="submit" 
-                   class="w-full sm:w-auto px-6 py-3 bg-red-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-md hover:bg-red-700 transition-all active:scale-95">
-                    Sim, Eliminar
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-            <script>
-                // Função para abrir o modal com animação suave
-                function confirmarExclusao() {
-                    const modal = document.getElementById('modalExclusao');
-                    const contentor = modal.firstElementChild;
-
-                    // Mostra o fundo (fade-in)
-                    modal.classList.remove('hidden');
-                    modal.classList.add('flex');
-                    setTimeout(() => { modal.classList.remove('opacity-0'); }, 10);
-
-                    // Anima o conteúdo (scale-up)
-                    setTimeout(() => { contentor.classList.remove('scale-95'); contentor.classList.add('scale-100'); }, 10);
-                }
-
-                // Função para fechar o modal com animação suave
-                function fecharModalExclusao() {
-                    const modal = document.getElementById('modalExclusao');
-                    const contentor = modal.firstElementChild;
-
-                    // Esconde o conteúdo (scale-down)
-                    contentor.classList.add('scale-95');
-                    contentor.classList.remove('scale-100');
-
-                    // Esconde o fundo (fade-out)
-                    modal.classList.add('opacity-0');
-                    
-                    // Remove do DOM após a animação acabar (300ms)
-                    setTimeout(() => {
-                        modal.classList.add('hidden');
-                        modal.classList.remove('flex');
-                    }, 300);
-                }
-            </script>
+            
     </body>
     </html>`;
 };
@@ -601,15 +518,7 @@ function renderError(titulo, mensagem, icone) {
 // ==========================================
 // 6. EXPORTAÇÃO
 // ==========================================
-module.exports = {
-    headerPadrao,
-    renderModais,
-    renderDashboard,
-    renderPerfil,
-    renderError,
-    renderGestaoUtilizadores,
-    renderSuperAdminDashboard
-};
+// Exportar no final do ficheiro (após todas as funções estarem declaradas)
 
 // ==========================================
 // PÁGINA: SUPER-ADMIN (ACESSO GLOBAL)
@@ -619,14 +528,24 @@ function renderSuperAdminDashboard(users = [], files = [], logs = []) {
     const totalFiles = files.length;
     const totalLogs = logs.length;
 
+    // Prepara um mapa JSON de utilizadores para o JS preencher os modais sem problemas de escaping
+    const usuariosMap = {};
+    users.forEach(u => { usuariosMap[u.id] = { id: u.id, nome: u.nome, email: u.email || '', departamento: u.departamento || '', cargo: u.cargo || 'usuário' }; });
+
     const userRows = users.map(u => `
-        <tr class="hover:bg-slate-50/50">
-            <td class="px-6 py-4">${u.id}</td>
-            <td class="px-6 py-4 font-bold text-slate-800">${u.nome}</td>
-            <td class="px-6 py-4 text-slate-500">${u.departamento}</td>
-            <td class="px-6 py-4 text-[10px] font-black">${u.cargo}</td>
+        <tr class="hover:bg-slate-50/50" data-user-id="${u.id}">
+            <td class="px-4 py-3">${u.id}</td>
+            <td class="px-4 py-3 font-bold text-slate-800">${u.nome}</td>
+            <td class="px-4 py-3 text-slate-500">${u.departamento || '—'}</td>
+            <td class="px-4 py-3 text-[10px] font-black">${u.cargo}</td>
+            <td class="px-4 py-3">
+                <div class="flex items-center justify-between">
+                    <button type="button" onclick="abrirModalEditarUsuario(${u.id})" class="px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-bold hover:bg-blue-100">Editar</button>
+                    <button type="button" onclick="confirmarEliminarUsuario(${u.id})" class="px-3 py-2 rounded-lg bg-red-50 text-red-600 text-sm font-black hover:bg-red-100">Eliminar</button>
+                </div>
+            </td>
         </tr>
-    `).join('') || `<tr><td colspan="4" class="p-8 text-center text-slate-400 italic">Sem utilizadores.</td></tr>`;
+    `).join('') || `<tr><td colspan="5" class="p-8 text-center text-slate-400 italic">Sem utilizadores.</td></tr>`;
 
     const fileRows = files.map(f => `
         <tr class="hover:bg-slate-50/50">
@@ -669,7 +588,9 @@ function renderSuperAdminDashboard(users = [], files = [], logs = []) {
                         <div class="text-[10px] text-slate-400 uppercase font-black">Ficheiros</div>
                         <div class="text-xl font-black text-slate-800">${totalFiles}</div>
                     </div>
-                    <a href="/superadmin/logout" class="bg-amber-50 border border-amber-200 px-4 py-3 rounded-2xl font-black text-amber-700">Sair ADM</a>
+                        <button onclick="abrirModalCriarConta()" class="h-12 flex items-center gap-2 bg-green-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase shadow-sm hover:bg-green-700 transition-all">Criar Conta</button>
+                        <button onclick="abrirModalGerirUtilizadores()" class="h-12 flex items-center gap-2 bg-white border border-slate-200 px-4 py-3 rounded-2xl text-[11px] font-black uppercase shadow-sm hover:bg-slate-50 transition-all">Gerir Utilizadores</button>
+                        <a href="/superadmin/logout" class="bg-amber-50 border border-amber-200 px-4 py-3 rounded-2xl font-black text-amber-700">Sair ADM</a>
                 </div>
             </div>
 
@@ -689,20 +610,7 @@ function renderSuperAdminDashboard(users = [], files = [], logs = []) {
                     </div>
                 </div>
 
-                <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
-                    <div class="p-6 border-b border-slate-50">
-                        <h2 class="font-black text-slate-800">Utilizadores</h2>
-                        <p class="text-xs text-slate-400">Lista completa de utilizadores.</p>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
-                            <thead class="bg-slate-50 text-slate-500 text-[10px] uppercase font-black">
-                                <tr><th class="px-6 py-3">ID</th><th class="px-6 py-3">Nome</th><th class="px-6 py-3">Departamento</th><th class="px-6 py-3">Cargo</th></tr>
-                            </thead>
-                            <tbody>${userRows}</tbody>
-                        </table>
-                    </div>
-                </div>
+                <!-- Right column removed: use 'Gerir Utilizadores' modal instead -->
             </div>
 
             <div class="mt-8 bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
@@ -713,6 +621,197 @@ function renderSuperAdminDashboard(users = [], files = [], logs = []) {
                 <div class="p-2 overflow-y-auto max-h-72">${logRows}</div>
             </div>
         </main>
+        <!-- Modal Criar Conta para SuperAdmin -->
+        <div id="modalCriarConta" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-6">
+            <div class="bg-white w-full max-w-2xl rounded-2xl p-8 shadow-lg">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-2xl font-black text-slate-800">Criar Conta</h3>
+                    <button onclick="fecharModalCriarConta()" class="text-slate-400 hover:text-slate-700">Fechar ✕</button>
+                </div>
+                <form action="/registo" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-black text-slate-400 uppercase mb-2">Nome Completo</label>
+                        <input name="nome" required class="w-full px-4 py-3 border border-slate-100 rounded-lg" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-slate-400 uppercase mb-2">E-mail</label>
+                        <input type="email" name="email" required class="w-full px-4 py-3 border border-slate-100 rounded-lg" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-slate-400 uppercase mb-2">Senha</label>
+                        <input type="password" name="senha" required class="w-full px-4 py-3 border border-slate-100 rounded-lg" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-slate-400 uppercase mb-2">Departamento</label>
+                        <select name="departamento" required class="w-full px-4 py-3 border border-slate-100 rounded-lg">
+                            <option value="" disabled selected>Selecionar Área</option>
+                            <option value="dt1">DT1</option>
+                            <option value="dt2">DT2</option>
+                            <option value="dt3">DT3</option>
+                            <option value="dt4">DT4</option>
+                            <option value="dt5">DT5</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-slate-400 uppercase mb-2">Cargo</label>
+                        <select name="cargo" class="w-full px-4 py-3 border border-slate-100 rounded-lg">
+                            <option value="usuário">usuário</option>
+                            <option value="admin">admin</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-2 flex justify-end gap-3 mt-2">
+                        <button type="button" onclick="fecharModalCriarConta()" class="px-6 py-3 bg-slate-100 rounded-lg font-bold">Cancelar</button>
+                        <button type="submit" class="px-6 py-3 bg-green-600 text-white rounded-lg font-black">Criar Conta</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal Gerir Utilizadores (lista expandida) -->
+        <div id="modalGerirUtilizadores" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-6">
+            <div class="bg-white w-full max-w-5xl rounded-2xl p-6 shadow-lg overflow-auto">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-2xl font-black text-slate-800">Gerir Utilizadores</h3>
+                        <div class="flex items-center gap-3">
+                        <button onclick="fecharModalGerirUtilizadores()" class="px-4 py-2 bg-slate-100 rounded-md">Fechar</button>
+                    </div>
+                </div>
+                <div class="w-full overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-50 text-slate-500 text-[12px] uppercase font-black">
+                            <tr>
+                                <th class="px-4 py-3">ID</th>
+                                <th class="px-4 py-3">Nome</th>
+                                <th class="px-4 py-3">E-mail</th>
+                                <th class="px-4 py-3">Departamento</th>
+                                <th class="px-4 py-3">Cargo</th>
+                                <th class="px-4 py-3 text-right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${users.map(u => `
+                                <tr class="border-b border-slate-100 hover:bg-slate-50">
+                                    <td class="px-4 py-3 align-top">${u.id}</td>
+                                    <td class="px-4 py-3 font-bold">${u.nome}</td>
+                                    <td class="px-4 py-3 text-sm text-slate-500">${u.email || '—'}</td>
+                                    <td class="px-4 py-3">${u.departamento || '—'}</td>
+                                    <td class="px-4 py-3 text-[12px] font-black">${u.cargo}</td>
+                                    <td class="px-4 py-3 text-right">
+                                        <button type="button" onclick="abrirModalEditarUsuario(${u.id})" class="px-4 py-2 mr-2 bg-blue-50 text-blue-700 rounded-md font-bold hover:bg-blue-100">Editar</button>
+                                        <button type="button" onclick="confirmarEliminarUsuario(${u.id})" class="px-4 py-2 bg-red-50 text-red-600 rounded-md font-bold hover:bg-red-100">Eliminar</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Modal Editar Usuario -->
+        <div id="modalEditarUsuario" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-6">
+            <div class="bg-white w-full max-w-2xl rounded-2xl p-8 shadow-lg">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-2xl font-black text-slate-800">Editar Utilizador</h3>
+                    <button onclick="fecharModalEditarUsuario()" class="text-slate-400 hover:text-slate-700">Fechar ✕</button>
+                </div>
+                <form id="formEditarUsuario" action="/superadmin/editar-usuario" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="hidden" name="id" id="edit_user_id">
+                    <div>
+                        <label class="block text-xs font-black text-slate-400 uppercase mb-2">Nome Completo</label>
+                        <input id="edit_nome" name="nome" required class="w-full px-4 py-3 border border-slate-100 rounded-lg" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-slate-400 uppercase mb-2">E-mail</label>
+                        <input id="edit_email" type="email" name="email" required class="w-full px-4 py-3 border border-slate-100 rounded-lg" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-slate-400 uppercase mb-2">Nova Senha (opcional)</label>
+                        <input id="edit_senha" type="password" name="senha" class="w-full px-4 py-3 border border-slate-100 rounded-lg" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-slate-400 uppercase mb-2">Departamento</label>
+                        <select id="edit_departamento" name="departamento" required class="w-full px-4 py-3 border border-slate-100 rounded-lg">
+                            <option value="dt1">DT1</option>
+                            <option value="dt2">DT2</option>
+                            <option value="dt3">DT3</option>
+                            <option value="dt4">DT4</option>
+                            <option value="dt5">DT5</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-slate-400 uppercase mb-2">Cargo</label>
+                        <select id="edit_cargo" name="cargo" class="w-full px-4 py-3 border border-slate-100 rounded-lg">
+                            <option value="usuário">usuário</option>
+                            <option value="admin">admin</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-2 flex justify-end gap-3 mt-2">
+                        <button type="button" onclick="fecharModalEditarUsuario()" class="px-6 py-3 bg-slate-100 rounded-lg font-bold">Cancelar</button>
+                        <button type="submit" class="px-6 py-3 bg-blue-600 text-white rounded-lg font-black">Salvar Alterações</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        
+
+        <script>
+            function abrirModalCriarConta(){ document.getElementById('modalCriarConta').classList.remove('hidden'); }
+            function fecharModalCriarConta(){ document.getElementById('modalCriarConta').classList.add('hidden'); }
+
+            function abrirModalGerirUtilizadores(){ document.getElementById('modalGerirUtilizadores').classList.remove('hidden'); }
+            function fecharModalGerirUtilizadores(){ document.getElementById('modalGerirUtilizadores').classList.add('hidden'); }
+
+            // Mapa de dados dos utilizadores (inserido pelo server-side)
+            const usuariosData = ${JSON.stringify(usuariosMap)};
+
+            function abrirModalEditarUsuario(id){
+                const u = usuariosData[id];
+                if(!u) return Swal.fire({ icon: 'error', title: 'Erro', text: 'Utilizador não encontrado.' });
+                document.getElementById('modalEditarUsuario').classList.remove('hidden');
+                document.getElementById('edit_user_id').value = u.id;
+                document.getElementById('edit_nome').value = u.nome || '';
+                document.getElementById('edit_email').value = u.email || '';
+                document.getElementById('edit_departamento').value = u.departamento || '';
+                document.getElementById('edit_cargo').value = u.cargo || 'usuário';
+                document.getElementById('edit_senha').value = '';
+            }
+            function fecharModalEditarUsuario(){ document.getElementById('modalEditarUsuario').classList.add('hidden'); }
+
+            function confirmarEliminarUsuario(id){
+                Swal.fire({
+                    title: 'Eliminar Utilizador?',
+                    text: 'Esta ação é irreversível. Deseja continuar?',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#ef4444',
+                    cancelButtonColor: '#6b7280',
+                    confirmButtonText: 'Sim, eliminar',
+                    cancelButtonText: 'Cancelar'
+                }).then((result) => {
+                    if (!result.isConfirmed) return;
+                    // Create and submit a form so the POST follows server redirects naturally
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = '/superadmin/eliminar-usuario/' + id;
+                    document.body.appendChild(form);
+                    form.submit();
+                });
+            }
+        </script>
     </body>
     </html>`;
 }
+
+// Exportar funções
+module.exports = {
+    headerPadrao,
+    renderModais,
+    renderDashboard,
+    renderPerfil,
+    renderError,
+    renderGestaoUtilizadores,
+    renderSuperAdminDashboard
+};

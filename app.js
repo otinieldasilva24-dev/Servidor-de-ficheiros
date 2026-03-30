@@ -1,5 +1,5 @@
 const bcrypt = require('bcrypt');
-const { renderDashboard, renderPerfil, renderError, renderGestaoUtilizadores, headerPadrao } = require('./utils/renders');
+const { renderDashboard, renderPerfil, renderError, renderGestaoUtilizadores, headerPadrao, renderSuperAdminDashboard } = require('./utils/renders');
 const express = require('express');
 const session = require('express-session');
 const db = require('./config/database');
@@ -178,10 +178,10 @@ app.get('/suporte', (req, res) => {
                         Clique abaixo para abrir o Gmail e falar com a equipa de TI.
                     </p>
                     
-                    <a href="https://mail.google.com/mail/?view=cm&fs=1&to=suporte.ti@inamet.gov.ao&su=Suporte Técnico - INAMET" 
+                    <a href="https://mail.google.com/mail/?view=cm&fs=1&to=robertozua161@gmail.com&su=Suporte Técnico - INAMET" 
                        target="_blank"
                        class="group relative inline-flex items-center justify-center w-full sm:w-auto px-8 py-6 bg-blue-700 rounded-2xl font-bold text-white shadow-lg hover:bg-blue-800 transition-all duration-300 overflow-hidden">
-                        <span class="relative z-10">suporte.ti@inamet.gov.ao</span>
+                        <span class="relative z-10">robertozua161@gmail.com</span>
                         <div class="absolute inset-0 bg-white/10 group-hover:bg-transparent transition-colors"></div>
                     </a>
                 </div>
@@ -214,7 +214,8 @@ app.get('/dashboard', (req, res) => {
         // 3. Configurar UTF-8 para evitar o erro de "ecrÃ£"
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
 
-        // 4. Enviar para o renders.js (O user agora está definido aqui dentro!)
+        // 4. Enviar para o renders.js (marcamos se é superadm para controlar UI)
+        user.superadm = !!req.session.superadm;
         res.send(renderDashboard(user, files));
     });
 });
@@ -267,62 +268,22 @@ app.post('/tornar-chefe', (req, res) => {
     const { codigo_secreto } = req.body;
     const user = req.session.user;
 
-    // DEFINA AQUI O SEU CÓDIGO REAL (Exemplo: '1234')
-    const CODIGO_CORRETO = '1234';
-
-    if (!user) return res.redirect('/login');
-
-    if (codigo_secreto === CODIGO_CORRETO) {
-        // CASO CERTO: Atualiza a sessão e volta à dashboard
-        req.session.user.cargo = 'admin';
-
-        // Garantir que a sessão é gravada antes do redirect
-        req.session.save(() => {
-            res.redirect('/dashboard');
-        });
-    } else {
-        // CASO ERRADO: Usa a função renderError do teu renders.js
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        const htmlErro = renderError(
-            'Acesso Negado',
-            'O código secreto inserido está incorreto. Tenta novamente.',
-            'error'
-        );
-        res.send(htmlErro);
+    // Promoção para 'admin' só é permitida pelo SuperAdmin via painel central.
+    if (!req.session || !req.session.superadm) {
+        return res.send(renderError('Acesso Negado', 'Apenas o SuperAdmin pode promover utilizadores. Utilize o painel SuperAdmin.', 'error'));
     }
+
+    // Se o SuperAdmin chamar esta rota manualmente, aconselhamos usar /admin/alterar-cargo.
+    return res.send(renderError('Info', 'Use o painel SuperAdmin para gerir cargos (Alternar Cargo).', 'info'));
 });
 
 // --- ROTA: SAIR DO MODO CHEFE (VOLTAR A UTILIZADOR COMUM) ---
-app.get('/sair-modo-chefe', (req, res) => {
-    // 1. Verificar se existe um utilizador na sessão
-    if (!req.session.user) return res.redirect('/login');
-
-    const userId = req.session.user.id;
-
-    // 2. Atualizar permanentemente na Base de Dados para 'comum'
-    const sql = "UPDATE usuarios SET cargo = 'comum' WHERE id = ?";
-
-    db.run(sql, [userId], function (err) {
-        if (err) {
-            console.error("Erro ao sair do modo chefe:", err.message);
-            return res.send(renderError("Erro", "Não foi possível alterar o cargo.", "error"));
-        }
-
-        // 3. Atualizar a SESSÃO para 'comum'
-        // Isso remove imediatamente os botões de "Eliminar" e "Equipa" da Dashboard
-        req.session.user.cargo = 'comum';
-
-        // 4. Gravar a sessão e redirecionar para a Dashboard limpa
-        req.session.save(() => {
-            res.redirect('/dashboard');
-        });
-    });
-});
+// Nota: A auto-demissão de 'chefe' foi removida — apenas SuperAdmin pode gerir cargos.
 
 app.get('/admin/alterar-cargo/:id/:novoCargo', (req, res) => {
-    // 1. Verificação de segurança
-    if (!req.session.user || req.session.user.cargo !== 'admin') {
-        return res.send(renderError("Acesso Negado", "Não tens permissão.", "error"));
+    // 1. Apenas o Administrador Principal (superadm) pode alterar cargos
+    if (!req.session || !req.session.superadm) {
+        return res.send(renderError("Acesso Negado", "Somente o administrador principal pode alterar cargos.", "error"));
     }
 
     const idParaAlterar = req.params.id;
@@ -343,7 +304,7 @@ app.get('/admin/alterar-cargo/:id/:novoCargo', (req, res) => {
         }
 
         console.log(`✅ Sucesso: Utilizador ${idParaAlterar} agora é ${novoCargo}`);
-        res.redirect('/admin/utilizadores');
+        res.redirect('/superadmin');
     });
 });
 
@@ -414,41 +375,13 @@ app.get('/perfil', (req, res) => {
 
 // Evita eliminação via GET: redireciona para perfil (usar POST com confirmação)
 app.get('/eliminar-conta', (req, res) => {
-    return res.redirect('/perfil');
+    return res.send(renderError('Acesso Negado', 'Eliminação de contas só por SuperAdmin via painel.', 'error'));
 });
 
 // Eliminar conta (POST) — exige confirmação de senha
 app.post('/eliminar-conta', (req, res) => {
-    const user = req.session.user;
-    if (!user) return res.redirect('/login');
-
-    const { senha_confirmacao } = req.body;
-    if (!senha_confirmacao) return res.send(renderError('Erro', 'É necessário inserir a senha para confirmar.', 'warning'));
-
-    const userId = user.id;
-
-    db.get('SELECT senha FROM usuarios WHERE id = ?', [userId], async (err, row) => {
-        if (err || !row) return res.send(renderError('Erro', 'Utilizador inválido.', 'error'));
-
-        try {
-            const valido = await bcrypt.compare(senha_confirmacao, row.senha);
-            if (!valido) return res.send(renderError('Erro', 'Senha incorreta. A conta não foi eliminada.', 'error'));
-
-            db.run('DELETE FROM usuarios WHERE id = ?', [userId], function (delErr) {
-                if (delErr) {
-                    console.error(delErr.message);
-                    return res.send(renderError('Erro', 'Não foi possível eliminar a conta.', 'error'));
-                }
-
-                req.session.destroy((sessErr) => {
-                    if (sessErr) console.error('Erro ao destruir sessão após eliminação:', sessErr.message);
-                    res.redirect('/login?status=deleted');
-                });
-            });
-        } catch (e) {
-            return res.send(renderError('Erro', 'Falha na verificação da senha.', 'error'));
-        }
-    });
+    // Eliminação de contas de utilizador via UI removida — apenas SuperAdmin pode eliminar contas.
+    return res.send(renderError('Acesso Negado', 'Eliminação de contas só por SuperAdmin via painel.', 'error'));
 });
 
 app.post('/perfil/atualizar', async (req, res) => {
@@ -536,7 +469,8 @@ app.post('/perfil/atualizar', async (req, res) => {
 app.get('/admin/utilizadores', (req, res) => {
     const userLogado = req.session.user; // Pega os dados de quem está logado
 
-    if (!userLogado) return res.redirect('/login');
+    // Apenas administradores do departamento ou o superadm podem acessar
+    if (!userLogado || (userLogado.cargo !== 'admin' && !req.session.superadm)) return res.redirect('/login');
 
     // FILTRO: Só seleciona utilizadores do MESMO departamento que o admin logado
     const sqlUsers = "SELECT id, nome, departamento, cargo FROM usuarios WHERE departamento = ? ORDER BY nome ASC";
@@ -553,7 +487,7 @@ app.get('/admin/utilizadores', (req, res) => {
 
         db.all(sqlLogs, [userLogado.departamento], (errLogs, logs) => {
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
-            res.send(renderGestaoUtilizadores(users, logs || []));
+            res.send(renderGestaoUtilizadores(users, logs || [], { superadm: !!req.session.superadm }));
         });
     });
 });
@@ -569,6 +503,102 @@ app.get('/logout', (req, res) => {
         res.clearCookie('connect.sid');
         if (err) console.error('Erro ao destruir sessão:', err);
         return res.redirect('/login');
+    });
+});
+
+// --- SUPERADMIN: Painel Global (listar utilizadores, ficheiros e logs) ---
+app.get('/superadmin', (req, res) => {
+    if (!req.session || !req.session.superadm) return res.redirect('/login');
+
+    // Buscar utilizadores, ficheiros e logs para exibir
+    const sqlUsers = "SELECT id, nome, email, departamento, cargo FROM usuarios ORDER BY nome ASC";
+    const sqlFiles = "SELECT id, nome_original, departamento, data_upload FROM ficheiros ORDER BY data_upload DESC LIMIT 50";
+    const sqlLogs = "SELECT * FROM logs_atividade ORDER BY id DESC LIMIT 100";
+
+    db.all(sqlUsers, [], (errUsers, users) => {
+        if (errUsers) return res.send(renderError('Erro', 'Não foi possível carregar utilizadores.', 'error'));
+
+        db.all(sqlFiles, [], (errFiles, files) => {
+            if (errFiles) return res.send(renderError('Erro', 'Não foi possível carregar ficheiros.', 'error'));
+
+            db.all(sqlLogs, [], (errLogs, logs) => {
+                if (errLogs) return res.send(renderError('Erro', 'Não foi possível carregar logs.', 'error'));
+
+                res.setHeader('Content-Type', 'text/html; charset=utf-8');
+                res.send(renderSuperAdminDashboard(users || [], files || [], logs || []));
+            });
+        });
+    });
+});
+
+// --- ROTA: Registo/Criação de conta (apenas SuperAdmin pode criar) ---
+app.post('/registo', async (req, res) => {
+    if (!req.session || !req.session.superadm) return res.send(renderError('Acesso Negado', 'Apenas o SuperAdmin pode criar contas.', 'error'));
+
+    const { nome, email, senha, departamento, cargo } = req.body;
+    if (!nome || !email || !senha || !departamento) return res.send(renderError('Dados em falta', 'Preencha todos os campos obrigatórios.', 'warning'));
+
+    try {
+        const hash = await bcrypt.hash(senha, 10);
+        const sql = "INSERT INTO usuarios (nome, email, senha, departamento, cargo) VALUES (?, ?, ?, ?, ?)";
+        db.run(sql, [nome, email, hash, departamento, cargo || 'usuário'], function (err) {
+            if (err) {
+                console.error('Erro ao criar utilizador:', err.message);
+                return res.send(renderError('Erro', 'Não foi possível criar a conta. Verifique se o e-mail já existe.', 'error'));
+            }
+            return res.redirect('/superadmin');
+        });
+    } catch (e) {
+        console.error('Erro BCRYPT:', e);
+        return res.send(renderError('Erro', 'Erro ao processar a senha.', 'error'));
+    }
+});
+
+// --- ROTA: Editar utilizador via SuperAdmin ---
+app.post('/superadmin/editar-usuario', async (req, res) => {
+    if (!req.session || !req.session.superadm) return res.send(renderError('Acesso Negado', 'Apenas o SuperAdmin pode editar utilizadores.', 'error'));
+
+    const { id, nome, email, departamento, cargo, senha } = req.body;
+    if (!id || !nome || !email || !departamento) return res.send(renderError('Dados em falta', 'Campos obrigatórios em falta.', 'warning'));
+
+    try {
+        if (senha && senha.trim() !== '') {
+            const hash = await bcrypt.hash(senha, 10);
+            const sql = "UPDATE usuarios SET nome = ?, email = ?, departamento = ?, cargo = ?, senha = ? WHERE id = ?";
+            db.run(sql, [nome, email, departamento, cargo || 'usuário', hash, id], function (err) {
+                if (err) return res.send(renderError('Erro', 'Não foi possível atualizar o utilizador.', 'error'));
+                return res.redirect('/superadmin');
+            });
+        } else {
+            const sql = "UPDATE usuarios SET nome = ?, email = ?, departamento = ?, cargo = ? WHERE id = ?";
+            db.run(sql, [nome, email, departamento, cargo || 'usuário', id], function (err) {
+                if (err) return res.send(renderError('Erro', 'Não foi possível atualizar o utilizador.', 'error'));
+                return res.redirect('/superadmin');
+            });
+        }
+    } catch (e) {
+        console.error('Erro ao editar utilizador:', e);
+        return res.send(renderError('Erro', 'Erro ao processar a requisição.', 'error'));
+    }
+});
+
+// --- ROTA: Eliminar utilizador (apenas SuperAdmin) ---
+app.post('/superadmin/eliminar-usuario/:id', (req, res) => {
+    if (!req.session || !req.session.superadm) return res.send(renderError('Acesso Negado', 'Apenas o SuperAdmin pode eliminar utilizadores.', 'error'));
+
+    const id = req.params.id;
+    // Não permitir que o SuperAdmin se elimine a si próprio via painel
+    if (req.session.user && String(req.session.user.id) === String(id)) {
+        return res.send(renderError('Ação Inválida', 'Não pode eliminar a sua própria conta enquanto estiver logado.', 'warning'));
+    }
+
+    const sql = "DELETE FROM usuarios WHERE id = ?";
+    db.run(sql, [id], function (err) {
+        if (err) {
+            console.error('Erro ao eliminar utilizador:', err.message);
+            return res.send(renderError('Erro', 'Não foi possível eliminar o utilizador.', 'error'));
+        }
+        return res.redirect('/superadmin');
     });
 });
 
