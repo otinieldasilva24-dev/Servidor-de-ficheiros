@@ -104,8 +104,9 @@ function renderModais(user) {
 // ==========================================
 const renderGestaoUtilizadores = (users, logs = [], opts = {}) => {
     const isSuperadm = !!opts.superadm;
-    // Renderização da Tabela de Usuários (Usuários da Equipa)
-        const rows = users.map(u => `
+    
+    // Renderização da Tabela de Usuários
+    const rows = users.map(u => `
         <tr class="hover:bg-slate-50/50 transition-all group">
             <td class="px-8 py-5">
                 <div class="flex items-center gap-3">
@@ -113,8 +114,8 @@ const renderGestaoUtilizadores = (users, logs = [], opts = {}) => {
                         ${u.nome.charAt(0)}
                     </div>
                     <div>
-                        <span class="font-bold text-slate-700 block text-sm">${u.nome}</span>
-                        <span class="text-[9px] text-slate-400 uppercase font-black tracking-widest">ID: ${u.id}</span>
+                        <span class="font-bold text-slate-700 block text-sm user-name-text">${u.nome}</span>
+                        <span class="text-[9px] text-slate-400 uppercase font-black tracking-widest">ID: <span class="user-id-text">${u.id}</span></span>
                     </div>
                 </div>
             </td>
@@ -135,7 +136,7 @@ const renderGestaoUtilizadores = (users, logs = [], opts = {}) => {
         </tr>
     `).join('');
 
-    // Renderização dos Logs com lógica de cores para Eliminação
+    // ... (Mantive a lógica dos logs igual)
     const logRows = logs.length > 0 ? logs.map(l => {
         let corBola = 'bg-green-400';
         let corTexto = 'text-green-600';
@@ -173,35 +174,29 @@ const renderGestaoUtilizadores = (users, logs = [], opts = {}) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Gestão e Auditoria - INAMET</title>
         <script src="https://cdn.tailwindcss.com"></script>
-        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
         <style>
             @keyframes fade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
             .animate-fade { animation: fade 0.4s ease-out forwards; }
             .custom-scroll::-webkit-scrollbar { width: 4px; }
-            .custom-scroll::-webkit-scrollbar-track { background: transparent; }
             .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
             .filter-btn { background: #f8fafc; color: #94a3b8; border: 1px solid #f1f5f9; cursor: pointer; transition: all 0.2s; }
             .filter-btn.active { background: #1d4ed8; color: white; border-color: #1d4ed8; box-shadow: 0 4px 12px rgba(29, 78, 216, 0.2); }
         </style>
     </head>
-    <body class="bg-slate-50 min-h-screen overflow-x-hidden">
+    <body class="bg-slate-50 min-h-screen">
         ${headerPadrao}
         
         <main class="container mx-auto px-6 pt-32 pb-10 animate-fade">
             <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8">
                 <div>
                     <h2 class="text-3xl font-black text-slate-800 tracking-tighter uppercase leading-none">Gestão e <span class="text-blue-600">Auditoria</span></h2>
-                    <p class="text-slate-500 font-medium italic mt-2 text-sm">Controlo de acesso e histórico de ficheiros.</p>
+                    <p class="text-slate-500 font-medium italic mt-2 text-sm">Controlo de acesso do departamento.</p>
                 </div>
                 <div class="flex gap-3">
                     <div class="bg-white border border-slate-200 px-5 py-3 rounded-2xl shadow-sm text-center">
-                        <span class="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Equipa</span>
+                        <span class="block text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Membros</span>
                         <span class="text-xl font-black text-slate-800">${users.length}</span>
                     </div>
-                    <!-- Criar Conta removido para que apenas SuperAdmin possa criar contas -->
                     <a href="/dashboard" class="h-14 flex items-center bg-blue-600 text-white px-8 rounded-2xl text-[10px] font-black uppercase shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all">
                         Voltar
                     </a>
@@ -211,10 +206,26 @@ const renderGestaoUtilizadores = (users, logs = [], opts = {}) => {
             <div class="grid lg:grid-cols-3 gap-8 items-start">
                 <div class="lg:col-span-2 bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
                     <div class="p-6 border-b border-slate-50 bg-slate-50/30">
-                        <h3 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Usuários do Departamento</h3>
+                        <h3 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">Filtrar Equipa</h3>
+                        
+                        <div class="relative">
+                            <input 
+                                type="text" 
+                                id="searchUsersInput" 
+                                onkeyup="filterUsers()" 
+                                placeholder="Procurar por nome ou ID..." 
+                                class="w-full px-5 py-3 bg-white border border-slate-200 rounded-2xl outline-none focus:border-blue-600 transition-all text-sm text-slate-700 font-medium shadow-sm"
+                            >
+                            <div class="absolute right-4 top-3 text-slate-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </div>
+                        </div>
                     </div>
+
                     <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
+                        <table class="w-full text-left border-collapse" id="table-users-dept">
                             <tbody class="divide-y divide-slate-50">${rows}</tbody>
                         </table>
                     </div>
@@ -224,17 +235,15 @@ const renderGestaoUtilizadores = (users, logs = [], opts = {}) => {
                     <div class="bg-white rounded-[2.5rem] shadow-md border border-slate-100 overflow-hidden flex flex-col h-[480px] sticky top-32">
                         <div class="p-6 border-b border-slate-50 bg-slate-50/30 space-y-4">
                             <div class="flex justify-between items-center">
-                                <h3 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Registo Recente</h3>
-                                <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                                <h3 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Histórico</h3>
+                                <span class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
                             </div>
                             <div class="flex gap-1.5 overflow-x-auto">
                                 <button onclick="filtrarLogs('TODOS')" id="btn-todos" class="filter-btn active flex-1 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest">Todos</button>
                                 <button onclick="filtrarLogs('UPLOAD')" id="btn-upload" class="filter-btn flex-1 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest">Uploads</button>
                                 <button onclick="filtrarLogs('DOWNLOAD')" id="btn-download" class="filter-btn flex-1 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest">Downloads</button>
-                                <button onclick="filtrarLogs('ELIMINACAO')" id="btn-eliminacao" class="filter-btn flex-1 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest">Apagados</button>
                             </div>
                         </div>
-
                         <div id="container-logs" class="overflow-y-auto flex-1 custom-scroll bg-white">
                             ${logRows}
                         </div>
@@ -244,11 +253,31 @@ const renderGestaoUtilizadores = (users, logs = [], opts = {}) => {
         </main>
 
         <script>
+            // FUNÇÃO DE FILTRO PARA UTILIZADORES
+            function filterUsers() {
+                const q = document.getElementById('searchUsersInput').value.toLowerCase().trim();
+                const rows = document.querySelectorAll('#table-users-dept tbody tr');
+
+                rows.forEach(row => {
+                    const nome = row.querySelector('.user-name-text').textContent.toLowerCase();
+                    const id = row.querySelector('.user-id-text').textContent.toLowerCase();
+                    
+                    if (nome.includes(q) || id.includes(q)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            }
+
+            // FUNÇÃO DE FILTRO PARA LOGS
             function filtrarLogs(tipo) {
                 const logs = document.querySelectorAll('.log-item');
                 const botoes = document.querySelectorAll('.filter-btn');
                 botoes.forEach(btn => btn.classList.remove('active'));
-                document.getElementById('btn-' + tipo.toLowerCase()).classList.add('active');
+                
+                const btnAtivo = document.getElementById('btn-' + tipo.toLowerCase());
+                if(btnAtivo) btnAtivo.classList.add('active');
 
                 logs.forEach(log => {
                     const logTipo = log.getAttribute('data-tipo');
@@ -535,28 +564,8 @@ function renderSuperAdminDashboard(users = [], files = [], logs = []) {
     const totalFiles = files.length;
     const totalLogs = logs.length;
 
-    // Prepara um mapa JSON de utilizadores para o JS preencher os modais sem problemas de escaping
     const usuariosMap = {};
     users.forEach(u => { usuariosMap[u.id] = { id: u.id, nome: u.nome, email: u.email || '', departamento: u.departamento || '', cargo: u.cargo || 'usuário' }; });
-
-    const userRows = users.map(u => `
-        <tr class="hover:bg-slate-50/50" data-user-id="${u.id}">
-            <td class="px-4 py-3">${u.id}</td>
-            <td class="px-4 py-3 font-bold text-slate-800">${u.nome}</td>
-            <td class="px-4 py-3 text-slate-500">${u.departamento || '—'}</td>
-            <td class="px-4 py-3 text-[10px] font-black">${u.cargo}</td>
-            <td class="px-4 py-3">
-                <div class="flex items-center justify-between">
-                    <button type="button" onclick="abrirModalEditarUsuario(${u.id})" class="px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-bold hover:bg-blue-100">Editar</button>
-                  <button type="button" 
-        onclick="confirmarEliminarUsuario('${u.id}')" 
-        class="px-3 py-2 rounded-lg bg-red-50 text-red-600 text-sm font-black hover:bg-red-100">
-    Eliminar
-                 </button>
-                </div>
-            </td>
-        </tr>
-    `).join('') || `<tr><td colspan="5" class="p-8 text-center text-slate-400 italic">Sem utilizadores.</td></tr>`;
 
     const fileRows = files.map(f => `
         <tr class="hover:bg-slate-50/50">
@@ -582,6 +591,10 @@ function renderSuperAdminDashboard(users = [], files = [], logs = []) {
         <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
         <title>Admin Geral - INAMET</title>
         <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+            .custom-scroll::-webkit-scrollbar { width: 4px; }
+            .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        </style>
     </head>
     <body class="bg-slate-50 min-h-screen font-sans">
         ${headerPadrao}
@@ -600,9 +613,9 @@ function renderSuperAdminDashboard(users = [], files = [], logs = []) {
                         <div class="text-[10px] text-slate-400 uppercase font-black">Ficheiros</div>
                         <div class="text-xl font-black text-slate-800">${totalFiles}</div>
                     </div>
-                        <button onclick="abrirModalCriarConta()" class="h-12 flex items-center gap-2 bg-green-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase shadow-sm hover:bg-green-700 transition-all">Criar Conta</button>
-                        <button onclick="abrirModalGerirUtilizadores()" class="h-12 flex items-center gap-2 bg-white border border-slate-200 px-4 py-3 rounded-2xl text-[11px] font-black uppercase shadow-sm hover:bg-slate-50 transition-all">Gerir Utilizadores</button>
-                        <a href="/superadmin/logout" class="bg-amber-50 border border-amber-200 px-4 py-3 rounded-2xl font-black text-amber-700">Sair ADM</a>
+                    <button onclick="abrirModalCriarConta()" class="h-12 flex items-center gap-2 bg-green-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase shadow-sm hover:bg-green-700 transition-all">Criar Conta</button>
+                    <button onclick="abrirModalGerirUtilizadores()" class="h-12 flex items-center gap-2 bg-white border border-slate-200 px-4 py-3 rounded-2xl text-[11px] font-black uppercase shadow-sm hover:bg-slate-50 transition-all">Gerir Utilizadores</button>
+                    <a href="/superadmin/logout" class="bg-amber-50 border border-amber-200 px-4 py-3 rounded-2xl font-black text-amber-700">Sair ADM</a>
                 </div>
             </div>
 
@@ -621,19 +634,83 @@ function renderSuperAdminDashboard(users = [], files = [], logs = []) {
                         </table>
                     </div>
                 </div>
-
-                <!-- Right column removed: use 'Gerir Utilizadores' modal instead -->
-            </div>
-
-            <div class="mt-8 bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
-                <div class="p-6 border-b border-slate-50">
-                    <h2 class="font-black text-slate-800">Registo de Atividades</h2>
-                    <p class="text-xs text-slate-400">Últimos eventos do sistema.</p>
+                
+                <div class="lg:col-span-1">
+                    <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                         <div class="p-6 border-b border-slate-50">
+                            <h2 class="font-black text-slate-800">Registo de Atividades</h2>
+                            <p class="text-xs text-slate-400">Últimos eventos do sistema.</p>
+                        </div>
+                        <div class="p-2 overflow-y-auto max-h-[400px] custom-scroll">${logRows}</div>
+                    </div>
                 </div>
-                <div class="p-2 overflow-y-auto max-h-72">${logRows}</div>
             </div>
         </main>
-        <!-- Modal Criar Conta para SuperAdmin -->
+
+        <div id="modalGerirUtilizadores" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-6">
+            <div class="bg-white w-full max-w-5xl rounded-[2.5rem] p-8 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-black text-slate-800 uppercase tracking-tighter">Gerir Utilizadores</h3>
+                    <button onclick="fecharModalGerirUtilizadores()" class="px-6 py-2 bg-slate-100 text-slate-500 rounded-xl font-bold hover:bg-slate-200 transition-all">Fechar</button>
+                </div>
+
+                <div class="mb-6 relative">
+                    <input 
+                        type="text" 
+                        id="searchUsersInput" 
+                        onkeyup="filterUsers()" 
+                        placeholder="Pesquisar por nome ou ID..." 
+                        class="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-600 focus:bg-white transition-all text-sm text-slate-700 font-medium shadow-sm"
+                    >
+                    <div class="absolute right-5 top-4 text-slate-300">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="overflow-y-auto custom-scroll flex-1 border border-slate-100 rounded-2xl">
+                    <table class="w-full text-left border-collapse" id="modalTableUsers">
+                        <thead class="bg-slate-50 sticky top-0 z-10 text-slate-400 text-[10px] uppercase font-black">
+                            <tr>
+                                <th class="px-6 py-4">ID</th>
+                                <th class="px-6 py-4">Nome</th>
+                                <th class="px-6 py-4">E-mail</th>
+                                <th class="px-6 py-4">Departamento</th>
+                                <th class="px-6 py-4">Cargo</th>
+                                <th class="px-6 py-4 text-right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-50">
+                            ${users.map(u => `
+                                <tr class="hover:bg-slate-50/50 transition-all">
+                                    <td class="px-6 py-4 text-xs font-bold text-slate-400">${u.id}</td>
+                                    <td class="px-6 py-4 font-bold text-slate-700 name-cell">${u.nome}</td>
+                                    <td class="px-6 py-4 text-sm text-slate-500">${u.email || '—'}</td>
+                                    <td class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">${u.departamento || '—'}</td>
+                                    <td class="px-6 py-4">
+                                        <span class="px-2 py-1 rounded-md text-[9px] font-black uppercase ${u.cargo === 'admin' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}">
+                                            ${u.cargo}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-right">
+                                        <div class="flex justify-end gap-2">
+                                            <button onclick="abrirModalEditarUsuario(${u.id})" class="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                            </button>
+                                            <button onclick="confirmarEliminarUsuario(${u.id})" class="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <div id="modalCriarConta" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-6">
             <div class="bg-white w-full max-w-2xl rounded-2xl p-8 shadow-lg">
                 <div class="flex justify-between items-center mb-4">
@@ -657,11 +734,7 @@ function renderSuperAdminDashboard(users = [], files = [], logs = []) {
                         <label class="block text-xs font-black text-slate-400 uppercase mb-2">Departamento</label>
                         <select name="departamento" required class="w-full px-4 py-3 border border-slate-100 rounded-lg">
                             <option value="" disabled selected>Selecionar Área</option>
-                            <option value="dt1">DT1</option>
-                            <option value="dt2">DT2</option>
-                            <option value="dt3">DT3</option>
-                            <option value="dt4">DT4</option>
-                            <option value="dt5">DT5</option>
+                            <option value="dt1">DT1</option><option value="dt2">DT2</option><option value="dt3">DT3</option><option value="dt4">DT4</option><option value="dt5">DT5</option>
                         </select>
                     </div>
                     <div>
@@ -679,49 +752,6 @@ function renderSuperAdminDashboard(users = [], files = [], logs = []) {
             </div>
         </div>
 
-        <!-- Modal Gerir Utilizadores (lista expandida) -->
-        <div id="modalGerirUtilizadores" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-6">
-            <div class="bg-white w-full max-w-5xl rounded-2xl p-6 shadow-lg overflow-auto">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-2xl font-black text-slate-800">Gerir Utilizadores</h3>
-                        <div class="flex items-center gap-3">
-                        <button onclick="fecharModalGerirUtilizadores()" class="px-4 py-2 bg-slate-100 rounded-md">Fechar</button>
-                    </div>
-                </div>
-                <div class="w-full overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead class="bg-slate-50 text-slate-500 text-[12px] uppercase font-black">
-                            <tr>
-                                <th class="px-4 py-3">ID</th>
-                                <th class="px-4 py-3">Nome</th>
-                                <th class="px-4 py-3">E-mail</th>
-                                <th class="px-4 py-3">Departamento</th>
-                                <th class="px-4 py-3">Cargo</th>
-                                <th class="px-4 py-3 text-right">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                                ${users.map(u => `
-                                    <tr class="border-b border-slate-100 hover:bg-slate-50">
-                                        <td class="px-4 py-3 align-top">${u.id}</td>
-                                        <td class="px-4 py-3 font-bold">${u.nome}</td>
-                                        <td class="px-4 py-3 text-sm text-slate-500">${u.email || '—'}</td>
-                                        <td class="px-4 py-3">${u.departamento || '—'}</td>
-                                        <td class="px-4 py-3 text-[12px] font-black">${u.cargo}</td>
-                                        <td class="px-4 py-3 text-right">
-                                            <button type="button" onclick="abrirModalEditarUsuario(${u.id})" class="px-4 py-2 mr-2 bg-blue-50 text-blue-700 rounded-md font-bold hover:bg-blue-100">Editar</button>
-                                            <button type="button" onclick="confirmarEliminarUsuario(${u.id})" class="px-4 py-2 bg-red-50 text-red-600 rounded-md font-bold hover:bg-red-100">Eliminar</button>
-                                        </td>
-                                    </tr>
-                                `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-
-        <!-- Modal Editar Usuario -->
         <div id="modalEditarUsuario" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-6">
             <div class="bg-white w-full max-w-2xl rounded-2xl p-8 shadow-lg">
                 <div class="flex justify-between items-center mb-4">
@@ -745,11 +775,7 @@ function renderSuperAdminDashboard(users = [], files = [], logs = []) {
                     <div>
                         <label class="block text-xs font-black text-slate-400 uppercase mb-2">Departamento</label>
                         <select id="edit_departamento" name="departamento" required class="w-full px-4 py-3 border border-slate-100 rounded-lg">
-                            <option value="dt1">DT1</option>
-                            <option value="dt2">DT2</option>
-                            <option value="dt3">DT3</option>
-                            <option value="dt4">DT4</option>
-                            <option value="dt5">DT5</option>
+                            <option value="dt1">DT1</option><option value="dt2">DT2</option><option value="dt3">DT3</option><option value="dt4">DT4</option><option value="dt5">DT5</option>
                         </select>
                     </div>
                     <div>
@@ -767,16 +793,28 @@ function renderSuperAdminDashboard(users = [], files = [], logs = []) {
             </div>
         </div>
 
-        
-
         <script>
+            function filterUsers() {
+                const q = document.getElementById('searchUsersInput').value.toLowerCase().trim();
+                const rows = document.querySelectorAll('#modalTableUsers tbody tr');
+
+                rows.forEach(row => {
+                    const id = row.querySelector('td:first-child').textContent.toLowerCase();
+                    const nome = row.querySelector('.name-cell').textContent.toLowerCase();
+                    
+                    if (nome.includes(q) || id.includes(q)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            }
+
             function abrirModalCriarConta(){ document.getElementById('modalCriarConta').classList.remove('hidden'); }
             function fecharModalCriarConta(){ document.getElementById('modalCriarConta').classList.add('hidden'); }
+            function abrirModalGerirUtilizadores(){ document.getElementById('modalGerirUtilizadores').classList.remove('flex'); document.getElementById('modalGerirUtilizadores').classList.add('flex'); document.getElementById('modalGerirUtilizadores').classList.remove('hidden'); }
+            function fecharModalGerirUtilizadores(){ document.getElementById('modalGerirUtilizadores').classList.add('hidden'); document.getElementById('modalGerirUtilizadores').classList.remove('flex'); }
 
-            function abrirModalGerirUtilizadores(){ document.getElementById('modalGerirUtilizadores').classList.remove('hidden'); }
-            function fecharModalGerirUtilizadores(){ document.getElementById('modalGerirUtilizadores').classList.add('hidden'); }
-
-            // Mapa de dados dos utilizadores (inserido pelo server-side)
             const usuariosData = ${JSON.stringify(usuariosMap)};
 
             function abrirModalEditarUsuario(id){
@@ -804,7 +842,6 @@ function renderSuperAdminDashboard(users = [], files = [], logs = []) {
                     cancelButtonText: 'Cancelar'
                 }).then((result) => {
                     if (!result.isConfirmed) return;
-                    // Create and submit a form so the POST follows server redirects naturally
                     const form = document.createElement('form');
                     form.method = 'POST';
                     form.action = '/superadmin/eliminar-usuario/' + id;
@@ -817,8 +854,44 @@ function renderSuperAdminDashboard(users = [], files = [], logs = []) {
     </html>`;
 }
 
-// Exportar funções
+// 1. Função de Filtro (Lógica de Navegador)
+// Esta função precisa ser injetada no HTML para funcionar no cliente
+const scriptFiltroUtilizadores = `
+<script>
+    function filterUsers() {
+        const input = document.getElementById('searchUsersInput');
+        if (!input) return;
+        
+        const q = input.value.trim().toLowerCase();
+        const tbody = document.querySelector('#modalGerirUtilizadores table tbody');
+        if (!tbody) return;
+        
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+
+        rows.forEach(row => {
+            const idTd = row.querySelector('td:nth-child(1)');
+            const nomeTd = row.querySelector('td:nth-child(2)');
+            
+            const idText = idTd ? idTd.textContent.trim().toLowerCase() : '';
+            const nomeText = nomeTd ? nomeTd.textContent.trim().toLowerCase() : '';
+
+            // Filtra por ID ou Nome
+            if (nomeText.includes(q) || idText === q) {
+                row.style.display = 'table-row';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+</script>
+`;
+
+// 2. Exportação Final Organizada
 module.exports = {
+    // Adicione esta variável dentro da sua função renderModais ou renderGestaoUtilizadores
+    // Exemplo: \${scriptFiltroUtilizadores} antes de fechar o </body>
+    scriptFiltroUtilizadores, 
+    
     headerPadrao,
     renderModais,
     renderDashboard,
