@@ -428,67 +428,74 @@ const renderPerfil = (user, estatisticas) => {
         <title>Perfil | INAMET</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <style>
-            .profile-card { border-top: 4px solid #1d4ed8; }
-            .input-focus:focus { border-color: #1d4ed8; ring: 2px; ring-color: #1d4ed8; }
+            .profile-card { border-top: 3px solid #1d4ed8; }
         </style>
     </head>
-    <body class="bg-slate-50 min-h-screen font-sans">
+    <body class="bg-slate-50 min-h-screen font-sans overflow-x-hidden">
         ${headerPadrao}
-        <main class="container mx-auto px-6 pt-32 pb-10">
+        
+        <main class="container mx-auto px-6 pt-24 pb-6">
             <div class="max-w-4xl mx-auto">
-                <div class="grid md:grid-cols-3 gap-8">
+                <div class="grid md:grid-cols-3 gap-6">
+                    
                     <div class="md:col-span-1">
-                        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 profile-card text-center">
-                            <div class="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
-                                <span class="text-3xl text-slate-300 font-bold">${user.nome.charAt(0)}</span>
+                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 profile-card text-center">
+                            <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3 border border-slate-100">
+                                <span class="text-xl text-slate-400 font-bold">${user.nome.charAt(0)}</span>
                             </div>
-                            <h2 class="text-xl font-bold text-slate-800">${user.nome}</h2>
-                            <p class="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-4">${user.departamento}</p>
-                            <div class="flex justify-between items-center p-4 bg-blue-50 rounded-2xl">
-                                <span class="text-[10px] font-black text-blue-700 uppercase tracking-tighter">Uploads Realizados</span>
-                                <span class="text-xl font-black text-blue-700">${estatisticas.uploads || 0}</span>
+                            <h2 class="text-lg font-bold text-slate-800 truncate">${user.nome}</h2>
+                            <p class="text-slate-400 text-[9px] uppercase font-bold tracking-widest mb-3">${user.departamento}</p>
+                            
+                            <div class="flex justify-between items-center p-3 bg-blue-50 rounded-xl">
+                                <span class="text-[9px] font-black text-blue-700 uppercase">Uploads</span>
+                                <span class="text-lg font-black text-blue-700">${estatisticas.uploads || 0}</span>
                             </div>
                         </div>
                     </div>
                     
                     <div class="md:col-span-2">
-                        <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-200">
-                            <h3 class="text-lg font-black text-slate-800 mb-6 border-b border-slate-50 pb-4 uppercase tracking-tight">Definições da Conta</h3>
-                            <form action="/perfil/atualizar" method="POST" class="space-y-6">
+                        <div class="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200">
+                            <h3 class="text-md font-black text-slate-800 mb-5 border-b border-slate-50 pb-3 uppercase tracking-tight">Definições</h3>
+                            
+                            <form action="/perfil/atualizar" method="POST" class="space-y-4">
+                                
                                 <div>
-                                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Nome de Utilizador</label>
+                                    <label class="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest">Nome de Utilizador</label>
                                     <input type="text" name="nome" value="${user.nome}" required 
-                                        class="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-600 focus:bg-white transition-all text-slate-700 font-bold">
+                                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-blue-600 focus:bg-white transition-all text-sm text-slate-700 font-bold">
                                 </div>
+
                                 <div>
-                                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Nova Palavra-Passe</label>
-                                    <input type="password" name="password" placeholder="Preencher apenas se quiser alterar" 
-                                        class="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-blue-600 focus:bg-white transition-all text-slate-700 font-bold">
-                                    <p class="text-[10px] text-slate-400 mt-2 italic">* Deixe em branco para manter a senha atual.</p>
+                                    <label class="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest">Palavra-Passe Atual (Confirmação)</label>
+                                    <input type="password" name="senha_atual" placeholder="Senha atual para validar" required
+                                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-blue-600 focus:bg-white transition-all text-sm text-slate-700 font-bold">
                                 </div>
-                                <div class="pt-4 flex items-center gap-6">
-                                    <button type="submit" class="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all">
-                                        Guardar Alterações
+
+                                <div>
+                                    <label class="block text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest">Nova Palavra-Passe (Opcional)</label>
+                                    <input type="password" name="password" placeholder="Preencher para alterar" 
+                                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-blue-600 focus:bg-white transition-all text-sm text-slate-700 font-bold">
+                                </div>
+
+                                <div class="pt-2 flex items-center gap-4">
+                                    <button type="submit" class="bg-blue-600 text-white px-6 py-3 rounded-xl font-black text-[9px] uppercase shadow-md hover:bg-blue-700 transition-all">
+                                        Guardar Dados
                                     </button>
-                                    <a href="/dashboard" class="text-slate-400 text-[10px] font-black uppercase hover:text-slate-800 tracking-widest">
-                                        Voltar
+                                    <a href="/dashboard" class="text-slate-400 text-[9px] font-black uppercase hover:text-slate-800">
+                                        Cancelar
                                     </a>
                                 </div>
                             </form>
 
-                            <div class="mt-12 pt-6 border-t border-slate-100">
-                                <h3 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Zona de Perigo</h3>
-                                <p class="text-xs text-slate-500">A eliminação de contas só pode ser feita pelo Administrador Geral (SuperAdmin). Contacte o SuperAdmin para quaisquer ações administrativas.</p>
+                            <div class="mt-8 pt-4 border-t border-slate-50">
+                                <p class="text-[10px] text-slate-400 italic">Deseja eliminar a conta? Contacte o <b>SuperAdmin</b>.</p>
                             </div>
                         </div>
                     </div>
+                    
                 </div>
             </div>
         </main>
-
-        
-
-            
     </body>
     </html>`;
 };

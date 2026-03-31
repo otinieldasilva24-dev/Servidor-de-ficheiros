@@ -387,83 +387,91 @@ app.post('/eliminar-conta', (req, res) => {
 app.post('/perfil/atualizar', async (req, res) => {
     if (!req.session.user) return res.redirect('/login');
 
-    const { nome, password } = req.body; // 'password' vem do nome do campo no teu HTML
+    // Agora pegamos também a 'senha_atual' que virá do teu formulário
+    const { nome, password, senha_atual } = req.body; 
     const userId = req.session.user.id;
 
-    // 1. Procurar os dados atuais usando a coluna correta 'senha'
+    // 1. Procurar a senha atual (hash) na base de dados
     db.get("SELECT senha FROM usuarios WHERE id = ?", [userId], async (err, row) => {
-        if (err) {
-            console.error("❌ ERRO BD SELECT:", err.message);
-            return res.send(renderError("Erro", "Erro ao aceder à base de dados.", "error"));
+        if (err || !row) {
+            return res.send(renderError("Erro", "Erro ao verificar utilizador.", "error"));
         }
 
-        let sql;
-        let params;
-        let mensagemSucesso = "As tuas informações foram guardadas!";
-
         try {
-            // Caso o usuário queira mudar a senha
+            // Caso o usuário queira mudar a senha (preencheu o campo nova senha)
             if (password && password.trim() !== "") {
 
-                // Validação de tamanho
+                // --- VALIDAÇÃO CRÍTICA: Verificar se informou a senha atual ---
+                if (!senha_atual || senha_atual.trim() === "") {
+                    return res.send(renderError("Segurança", "Deves introduzir a tua palavra-passe ATUAL para autorizar a mudança.", "warning"));
+                }
+
+                // --- VALIDAÇÃO CRÍTICA: Comparar a senha atual digitada com a da BD ---
+                const senhaAtualCorreta = await bcrypt.compare(senha_atual, row.senha);
+                if (!senhaAtualCorreta) {
+                    return res.send(renderError("Erro de Autenticação", "A palavra-passe atual está incorreta.", "error"));
+                }
+
+                // Validação de tamanho da nova senha
                 if (password.length < 6) {
                     return res.send(renderError("Senha Curta", "A nova palavra-passe deve ter pelo menos 6 caracteres.", "warning"));
                 }
 
-                // Comparação usando BCRYPT (como a senha na BD é um hash)
+                // Comparar se a nova é igual à antiga (opcional, mas bom)
                 const senhasIguais = await bcrypt.compare(password, row.senha);
                 if (senhasIguais) {
                     return res.send(renderError("Atenção", "A nova palavra-passe não pode ser igual à atual.", "info"));
                 }
 
-                // Gerar novo Hash para segurança
+                // Se passou em tudo, gera o novo Hash
                 const novoHash = await bcrypt.hash(password, 10);
-                sql = "UPDATE usuarios SET nome = ?, senha = ? WHERE id = ?";
-                params = [nome, novoHash, userId];
-                mensagemSucesso = "Perfil e Palavra-Passe atualizados com sucesso!";
+                const sql = "UPDATE usuarios SET nome = ?, senha = ? WHERE id = ?";
+                const params = [nome, novoHash, userId];
+                
+                executarUpdate(sql, params, "Perfil e Palavra-Passe atualizados!", res, req, nome);
+
             } else {
-                // Atualiza apenas o nome
-                sql = "UPDATE usuarios SET nome = ? WHERE id = ?";
-                params = [nome, userId];
+                // Atualiza apenas o nome (aqui podes decidir se pede a senha atual ou não. 
+                // Geralmente para o nome não se pede, mas se quiseres ser ultra rigoroso, podes pedir também.)
+                const sql = "UPDATE usuarios SET nome = ? WHERE id = ?";
+                const params = [nome, userId];
+                executarUpdate(sql, params, "Informações guardadas!", res, req, nome);
             }
-
-            // 2. Executar a atualização final
-            db.run(sql, params, function (err) {
-                if (err) {
-                    console.error("❌ ERRO SQL UPDATE:", err.message);
-                    return res.send(renderError("Erro", "Não foi possível atualizar os dados.", "error"));
-                }
-
-                // Atualizar nome na sessão para refletir no header
-                req.session.user.nome = nome;
-
-                req.session.save(() => {
-                    res.send(`
-                        <!DOCTYPE html>
-                        <html>
-                        <head>
-                            <meta charset="UTF-8">
-                            <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-                        </head>
-                        <body>
-                            <script>
-                                Swal.fire({
-                                    icon: 'success',
-                                    title: 'SUCESSO',
-                                    text: '${mensagemSucesso}',
-                                    confirmButtonColor: '#1d4ed8'
-                                }).then(() => { window.location.href = '/perfil'; });
-                            </script>
-                        </body>
-                        </html>
-                    `);
-                });
-            });
         } catch (e) {
-            res.send(renderError("Erro", "Erro ao processar segurança da senha.", "error"));
+            res.send(renderError("Erro", "Erro ao processar segurança.", "error"));
         }
     });
 });
+
+// Função auxiliar para não repetir código de db.run
+function executarUpdate(sql, params, mensagem, res, req, novoNome) {
+    db.run(sql, params, function (err) {
+        if (err) return res.send(renderError("Erro", "Erro ao atualizar BD.", "error"));
+        
+        req.session.user.nome = novoNome;
+        req.session.save(() => {
+            res.send(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+                </head>
+                <body>
+                    <script>
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'SUCESSO',
+                            text: '${mensagem}',
+                            confirmButtonColor: '#1d4ed8'
+                        }).then(() => { window.location.href = '/perfil'; });
+                    </script>
+                </body>
+                </html>
+            `);
+        });
+    });
+}
 
 // ROTA: Listar utilizadores E registos de atividade para o Chefe
 app.get('/admin/utilizadores', (req, res) => {
