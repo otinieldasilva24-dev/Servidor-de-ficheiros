@@ -233,32 +233,133 @@ app.post('/upload', upload.single('ficheiro'), (req, res) => {
         try { fs.unlinkSync(path.join(__dirname, 'uploads', req.file.filename)); } catch (e) { /* ignore */ }
         return res.send(renderError('Tipo inválido', 'Apenas ficheiros PDF, DOCX, PPTX e XLSM são permitidos.', 'warning'));
     }
+
     const user = req.session.user; // Facilitar o acesso aos dados do user
     const agora = new Date();
 
-    // Passo A: Inserir o ficheiro na tabela de ficheiros (Como já tinhas)
-    const sqlFicheiro = "INSERT INTO ficheiros (nome_original, nome_servidor, departamento, usuario_id, data_upload) VALUES (?, ?, ?, ?, ?)";
-    const paramsFicheiro = [nomeOriginal, req.file.filename, req.body.departamento, user.id, agora.toISOString()];
-
-    db.run(sqlFicheiro, paramsFicheiro, function (err) {
-        if (err) {
-            console.error("Erro ao guardar ficheiro:", err.message);
-            return res.send("Erro ao guardar na BD");
+    // Verifica duplicados por nome_original + departamento
+    db.get("SELECT * FROM ficheiros WHERE nome_original = ? AND departamento = ?", [nomeOriginal, req.body.departamento], (dupErr, existing) => {
+        if (dupErr) {
+            console.error('Erro ao verificar duplicados:', dupErr.message);
+            try { fs.unlinkSync(path.join(__dirname, 'uploads', req.file.filename)); } catch (e) { /* ignore */ }
+            return res.send(renderError('Erro', 'Falha ao verificar ficheiros existentes.', 'error'));
         }
 
-        // Passo B: ESCREVER O LOG (A parte nova para o Admin)
-        // Criamos os dados formatados para Angola (pt-AO)
-        const dataLog = agora.toLocaleDateString('pt-AO');
-        const horaLog = agora.toLocaleTimeString('pt-AO', { hour: '2-digit', minute: '2-digit' });
+        if (existing) {
+            // pergunta ao utilizador se deseja substituir ou abortar
+            const servidorTemp = req.file.filename;
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            return res.send(`
+                <!doctype html>
+                <html>
+                <head>
+                    <meta charset="utf-8" />
+                    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+                </head>
+                <body>
+                    <script>
+                        Swal.fire({
+                            title: 'Ficheiro Existente',
+                            html: 'O ficheiro "<b>${nomeOriginal}</b>" já existe no departamento. Deseja <b>substituir</b> o ficheiro existente ou <b>cancelar</b> o upload?',
+                            icon: 'question',
+                            showCancelButton: true,
+                            confirmButtonText: 'Substituir',
+                            cancelButtonText: 'Cancelar',
+                            confirmButtonColor: '#ef4444',
+                            allowOutsideClick: false
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                const form = document.createElement('form');
+                                form.method = 'POST';
+                                form.action = '/upload/replace';
+                                const inputs = {};
+                                inputs['existingId'] = '${existing.id}';
+                                inputs['newServerName'] = '${servidorTemp}';
+                                inputs['nomeOriginal'] = '${nomeOriginal.replace(/'/g, "\\'")}';
+                                inputs['departamento'] = '${(req.body.departamento||'').replace(/'/g, "\\'")}';
+                                inputs['usuario_id'] = '${user.id}';
+                                for (const k in inputs) {
+                                    const inp = document.createElement('input');
+                                    inp.type = 'hidden'; inp.name = k; inp.value = inputs[k]; form.appendChild(inp);
+                                }
+                                document.body.appendChild(form);
+                                form.submit();
+                            } else {
+                                fetch('/upload/abort', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ serverName: '${servidorTemp}' }) })
+                                .then(() => { window.location.href = '/dashboard'; })
+                                .catch(() => { window.location.href = '/dashboard'; });
+                            }
+                        });
+                    </script>
+                </body>
+                </html>
+            `);
+        }
 
-        const sqlLog = "INSERT INTO logs_atividade (usuario_nome, acao, ficheiro_nome, data_formatada, hora) VALUES (?, ?, ?, ?, ?)";
-        const paramsLog = [user.nome, 'UPLOAD', nomeOriginal, dataLog, horaLog];
+        // Sem duplicado: insere normalmente
+        const sqlFicheiro = "INSERT INTO ficheiros (nome_original, nome_servidor, departamento, usuario_id, data_upload) VALUES (?, ?, ?, ?, ?)";
+        const paramsFicheiro = [nomeOriginal, req.file.filename, req.body.departamento, user.id, agora.toISOString()];
 
-        db.run(sqlLog, paramsLog, (errLog) => {
-            if (errLog) console.error("⚠️ Erro ao gravar Log de Upload:", errLog.message);
+        db.run(sqlFicheiro, paramsFicheiro, function (err) {
+            if (err) {
+                console.error("Erro ao guardar ficheiro:", err.message);
+                return res.send("Erro ao guardar na BD");
+            }
 
-            // Redireciona apenas após tentar gravar o log
-            res.redirect('/dashboard');
+            const dataLog = agora.toLocaleDateString('pt-AO');
+            const horaLog = agora.toLocaleTimeString('pt-AO', { hour: '2-digit', minute: '2-digit' });
+
+            const sqlLog = "INSERT INTO logs_atividade (usuario_nome, acao, ficheiro_nome, data_formatada, hora) VALUES (?, ?, ?, ?, ?)";
+            const paramsLog = [user.nome, 'UPLOAD', nomeOriginal, dataLog, horaLog];
+
+            db.run(sqlLog, paramsLog, (errLog) => {
+                if (errLog) console.error("⚠️ Erro ao gravar Log de Upload:", errLog.message);
+                res.redirect('/dashboard');
+            });
+        });
+    });
+});
+
+// Rota para abortar upload (apaga ficheiro temporário)
+app.post('/upload/abort', express.json(), (req, res) => {
+    const serverName = req.body && req.body.serverName;
+    if (serverName) {
+        try { fs.unlinkSync(path.join(__dirname, 'uploads', serverName)); } catch (e) { /* ignore */ }
+    }
+    res.status(200).send('OK');
+});
+
+// Rota para substituir ficheiro existente pelo novo carregado
+app.post('/upload/replace', express.urlencoded({ extended: true }), (req, res) => {
+    const { existingId, newServerName, nomeOriginal, departamento, usuario_id } = req.body;
+    if (!existingId || !newServerName) return res.send(renderError('Erro', 'Dados incompletos para substituição.', 'error'));
+
+    db.get('SELECT * FROM ficheiros WHERE id = ?', [existingId], (errSel, existing) => {
+        if (errSel || !existing) {
+            try { fs.unlinkSync(path.join(__dirname, 'uploads', newServerName)); } catch (e) { /* ignore */ }
+            return res.send(renderError('Erro', 'Registo existente não encontrado.', 'error'));
+        }
+
+        // Apaga ficheiro antigo do servidor
+        try { fs.unlinkSync(path.join(__dirname, 'uploads', existing.nome_servidor)); } catch (e) { /* ignore */ }
+
+        // Atualiza o registo com o novo nome_servidor e info de upload
+        const agora = new Date();
+        const sqlUpdate = 'UPDATE ficheiros SET nome_servidor = ?, usuario_id = ?, data_upload = ? WHERE id = ?';
+        db.run(sqlUpdate, [newServerName, usuario_id || null, agora.toISOString(), existingId], function (errUp) {
+            if (errUp) {
+                console.error('Erro ao atualizar ficheiro existente:', errUp.message);
+                return res.send(renderError('Erro', 'Falha ao substituir ficheiro.', 'error'));
+            }
+
+            // Regista log de substituição
+            const dataLog = agora.toLocaleDateString('pt-AO');
+            const horaLog = agora.toLocaleTimeString('pt-AO', { hour: '2-digit', minute: '2-digit' });
+            db.run("INSERT INTO logs_atividade (usuario_nome, acao, ficheiro_nome, data_formatada, hora) VALUES (?, ?, ?, ?, ?)",
+                [(req.session.user && req.session.user.nome) || 'Desconhecido', 'REPLACE', nomeOriginal, dataLog, horaLog], (errLog) => {
+                    if (errLog) console.error('Erro ao gravar log de substituição:', errLog.message);
+                    res.redirect('/dashboard');
+                });
         });
     });
 });
