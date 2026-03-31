@@ -105,7 +105,7 @@ function renderModais(user) {
 const renderGestaoUtilizadores = (users, logs = [], opts = {}) => {
     const isSuperadm = !!opts.superadm;
     // Renderização da Tabela de Usuários (Usuários da Equipa)
-    const rows = users.map(u => `
+        const rows = users.map(u => `
         <tr class="hover:bg-slate-50/50 transition-all group">
             <td class="px-8 py-5">
                 <div class="flex items-center gap-3">
@@ -701,19 +701,19 @@ function renderSuperAdminDashboard(users = [], files = [], logs = []) {
                             </tr>
                         </thead>
                         <tbody>
-                            ${users.map(u => `
-                                <tr class="border-b border-slate-100 hover:bg-slate-50">
-                                    <td class="px-4 py-3 align-top">${u.id}</td>
-                                    <td class="px-4 py-3 font-bold">${u.nome}</td>
-                                    <td class="px-4 py-3 text-sm text-slate-500">${u.email || '—'}</td>
-                                    <td class="px-4 py-3">${u.departamento || '—'}</td>
-                                    <td class="px-4 py-3 text-[12px] font-black">${u.cargo}</td>
-                                    <td class="px-4 py-3 text-right">
-                                        <button type="button" onclick="abrirModalEditarUsuario(${u.id})" class="px-4 py-2 mr-2 bg-blue-50 text-blue-700 rounded-md font-bold hover:bg-blue-100">Editar</button>
-                                        <button type="button" onclick="confirmarEliminarUsuario(${u.id})" class="px-4 py-2 bg-red-50 text-red-600 rounded-md font-bold hover:bg-red-100">Eliminar</button>
-                                    </td>
-                                </tr>
-                            `).join('')}
+                                ${users.map(u => `
+                                    <tr class="border-b border-slate-100 hover:bg-slate-50">
+                                        <td class="px-4 py-3 align-top">${u.id}</td>
+                                        <td class="px-4 py-3 font-bold">${u.nome}</td>
+                                        <td class="px-4 py-3 text-sm text-slate-500">${u.email || '—'}</td>
+                                        <td class="px-4 py-3">${u.departamento || '—'}</td>
+                                        <td class="px-4 py-3 text-[12px] font-black">${u.cargo}</td>
+                                        <td class="px-4 py-3 text-right">
+                                            <button type="button" onclick="abrirModalEditarUsuario(${u.id})" class="px-4 py-2 mr-2 bg-blue-50 text-blue-700 rounded-md font-bold hover:bg-blue-100">Editar</button>
+                                            <button type="button" onclick="confirmarEliminarUsuario(${u.id})" class="px-4 py-2 bg-red-50 text-red-600 rounded-md font-bold hover:bg-red-100">Eliminar</button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
                         </tbody>
                     </table>
                 </div>

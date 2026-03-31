@@ -203,7 +203,7 @@ app.get('/dashboard', (req, res) => {
     }
 
     // 2. Consulta real à base de dados para os ficheiros
-    const query = "SELECT * FROM ficheiros WHERE departamento = ?";
+    const query = "SELECT * FROM ficheiros WHERE departamento = ? ORDER BY id DESC";
 
     db.all(query, [user.departamento], (err, files) => {
         if (err) {
@@ -481,7 +481,7 @@ app.get('/admin/utilizadores', (req, res) => {
     if (!userLogado || (userLogado.cargo !== 'admin' && !req.session.superadm)) return res.redirect('/login');
 
     // FILTRO: Só seleciona utilizadores do MESMO departamento que o admin logado
-    const sqlUsers = "SELECT id, nome, departamento, cargo FROM usuarios WHERE departamento = ? ORDER BY nome ASC";
+    const sqlUsers = "SELECT id, nome, departamento, cargo FROM usuarios WHERE departamento = ? ORDER BY id ASC";
 
     db.all(sqlUsers, [userLogado.departamento], (err, users) => {
         if (err) return res.send("Erro ao carregar lista.");
@@ -519,8 +519,8 @@ app.get('/superadmin', (req, res) => {
     if (!req.session || !req.session.superadm) return res.redirect('/login');
 
     // Buscar utilizadores, ficheiros e logs para exibir
-    const sqlUsers = "SELECT id, nome, email, departamento, cargo FROM usuarios ORDER BY nome ASC";
-    const sqlFiles = "SELECT id, nome_original, departamento, data_upload FROM ficheiros ORDER BY data_upload DESC LIMIT 50";
+    const sqlUsers = "SELECT id, nome, email, departamento, cargo FROM usuarios ORDER BY id ASC";
+    const sqlFiles = "SELECT id, nome_original, departamento, data_upload FROM ficheiros ORDER BY id DESC LIMIT 50";
     const sqlLogs = "SELECT * FROM logs_atividade ORDER BY id DESC LIMIT 100";
 
     db.all(sqlUsers, [], (errUsers, users) => {

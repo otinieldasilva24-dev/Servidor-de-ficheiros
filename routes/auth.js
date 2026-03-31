@@ -255,14 +255,14 @@ router.get('/superadmin', (req, res) => {
     if (!req.session.superadm) return res.redirect('/login');
 
     // Pega todos os utilizadores, ficheiros e logs
-    db.all('SELECT id, nome, departamento, cargo FROM usuarios ORDER BY nome ASC', [], (errUsers, users) => {
-        if (errUsers) return res.send(renderError('Erro', 'Falha ao carregar utilizadores.', 'error'));
+    db.all('SELECT id, nome, departamento, cargo FROM usuarios ORDER BY id ASC', [], (errUsers, users) => {
+        if (errUsers) return res.send(renderError('Erro', 'Não foi possível carregar utilizadores.', 'error'));
 
         db.all('SELECT * FROM ficheiros ORDER BY id DESC LIMIT 200', [], (errFiles, files) => {
-            if (errFiles) return res.send(renderError('Erro', 'Falha ao carregar ficheiros.', 'error'));
+            if (errFiles) return res.send(renderError('Erro', 'Não foi possível carregar ficheiros.', 'error'));
 
             db.all('SELECT * FROM logs_atividade ORDER BY id DESC LIMIT 200', [], (errLogs, logs) => {
-                if (errLogs) return res.send(renderError('Erro', 'Falha ao carregar logs.', 'error'));
+                if (errLogs) return res.send(renderError('Erro', 'Não foi possível carregar logs.', 'error'));
 
                 res.setHeader('Content-Type', 'text/html; charset=utf-8');
                 res.send(renderSuperAdminDashboard(users || [], files || [], logs || []));
